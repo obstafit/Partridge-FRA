@@ -26,7 +26,9 @@ No framework and no npm. Plain JavaScript and HTML, assembled by a Python build 
 
 ```
 build.py                 assembles src/ into dist/  (VERSION constant; bump on every release)
-src/index.html           all CSS (older styles first, then "MODERN SKIN (v3)" block + later additions at the end) and placeholders
+src/index.html           all CSS (older styles first, then "MODERN SKIN (v3)" block with the design tokens, later additions, and the "DESIGN SYSTEM (v2.8)" block last) and placeholders
+vendor/fonts/            Inter variable font, latin subset (SIL OFL 1.1); build.py inlines it in preview.html and copies it to dist/pwa (cached by the service worker)
+DESIGN-BRIEF.md          Mikey's UI redesign brief and agreed amendments (staged: 1 tokens/font/cards, 2 dashboard/stepper, 3 walk-through)
 src/profile_hmo.js       PROFILE_HMO: HMO checks, quick-add item types, suggested action wording, documents
 src/profile_flats.js     PROFILE_FLATS: purpose-built flats (common parts)
 src/profile_smallconv.js PROFILE_SMALLCONV: house converted into flats (mirrors his v3 Two/Three/Four-Flat templates)

@@ -8,14 +8,21 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SRC, DIST = os.path.join(ROOT, "src"), os.path.join(ROOT, "dist")
-VERSION = "2.7.0"
+VERSION = "2.8.0"
 
 def read(name):
     with open(os.path.join(SRC, name), encoding="utf-8") as f:
         return f.read()
 
-def assemble(jspdf_tag, pwa_head=""):
-    html = read("index.html")
+FONT = os.path.join(ROOT, "vendor", "fonts", "inter-latin-wght-normal.woff2")
+
+def fontface(src):
+    """Inter (SIL OFL 1.1, vendor/fonts), bundled so the app looks the same offline. Latin subset, variable weight."""
+    return ('@font-face{font-family:"Inter";font-style:normal;font-display:swap;font-weight:100 900;src:url(' + src + ') format("woff2");'
+            'unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}')
+
+def assemble(jspdf_tag, pwa_head="", font_src="inter-latin-wght-normal.woff2"):
+    html = read("index.html").replace("/*FONTFACE*/", fontface(font_src))
     html = html.replace("/*PROFILE*/", read("profile_hmo.js") + "\n" + read("profile_flats.js") + "\n" + read("profile_smallconv.js"))
     html = html.replace("/*APP*/", read("app.js") + "\n" + read("library.js") + "\n" + read("ai.js"))
     html = html.replace("/*PDF*/", read("pdf.js"))
@@ -24,9 +31,9 @@ def assemble(jspdf_tag, pwa_head=""):
     return html
 
 def icon(size, path):
-    im = Image.new("RGB", (size, size), (26, 45, 26))
+    im = Image.new("RGB", (size, size), (32, 41, 45))
     d = ImageDraw.Draw(im)
-    d.rectangle([0, int(size * 0.74), size, int(size * 0.79)], fill=(232, 100, 10))
+    d.rectangle([0, int(size * 0.74), size, int(size * 0.79)], fill=(239, 101, 11))
     try:
         f = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", int(size * 0.3))
     except OSError:
@@ -41,6 +48,7 @@ def main():
     pwa = os.path.join(DIST, "pwa")
     os.makedirs(pwa)
     shutil.copy(os.path.join(ROOT, "vendor", "jspdf.umd.min.js"), pwa)
+    shutil.copy(FONT, pwa); shutil.copy(os.path.join(ROOT, "vendor", "fonts", "Inter-OFL.txt"), pwa)
     icon(192, os.path.join(pwa, "icon-192.png"))
     icon(512, os.path.join(pwa, "icon-512.png"))
     head = ('<link rel="manifest" href="manifest.webmanifest">\n<link rel="apple-touch-icon" href="icon-192.png">\n'
@@ -54,13 +62,13 @@ def main():
     with open(os.path.join(pwa, "index.html"), "w", encoding="utf-8") as f:
         f.write(doc)
     manifest = {"name": "Partridge FRA", "short_name": "Partridge FRA", "start_url": "./", "scope": "./",
-                "display": "standalone", "orientation": "any", "background_color": "#f3f5f0", "theme_color": "#1a2d1a",
+                "display": "standalone", "orientation": "any", "background_color": "#F3F4F2", "theme_color": "#20292D",
                 "icons": [{"src": "icon-192.png", "sizes": "192x192", "type": "image/png"},
                           {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}]}
     with open(os.path.join(pwa, "manifest.webmanifest"), "w") as f:
         json.dump(manifest, f, indent=2)
     sw = f"""const CACHE = "pfs-fra-{VERSION}";
-const SHELL = ["./", "index.html", "jspdf.umd.min.js", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
+const SHELL = ["./", "index.html", "jspdf.umd.min.js", "inter-latin-wght-normal.woff2", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
 self.addEventListener("install", (e) => e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())));
 self.addEventListener("activate", (e) => e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())));
 self.addEventListener("fetch", (e) => {{
@@ -78,7 +86,10 @@ self.addEventListener("fetch", (e) => {{
                 " drag the folder onto app.netlify.com/drop). Open the address on the tablet, then use the browser's"
                 " 'Install app' or 'Add to Home Screen'. After the first visit it works with no signal.\n"
                 "Jobs and photos are stored on the tablet. Use Export all jobs regularly to keep a backup.\n")
-    preview = assemble('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>')
+    import base64
+    with open(FONT, "rb") as f:
+        font_uri = "data:font/woff2;base64," + base64.b64encode(f.read()).decode()
+    preview = assemble('<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>', font_src=font_uri)
     with open(os.path.join(DIST, "preview.html"), "w", encoding="utf-8") as f:
         f.write(preview)
     shutil.make_archive(os.path.join(DIST, "Partridge-FRA-app"), "zip", pwa)
