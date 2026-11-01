@@ -81,10 +81,12 @@ python3 test_store.py           # storage fallback when IndexedDB or localStorag
   - IndexedDB `pfs-fra` v2, with stores `jobs`, `photos` and `lib`.
   - On open, the app does a test write. If writes are refused (as in the claude.ai iPhone preview), it falls back to localStorage; if that is refused too, it keeps everything in memory and shows one warning banner on Home (`S.storeWarn`).
   - The app calls `navigator.storage.persist()` on boot.
-- **UI:**
-  - Phone tab bar: Home / Walk / Checks / Actions / Report.
+- **UI (v2.7 usability pass):**
+  - One linear flow of eight steps, defined once in `STEPS` (`app.js`): Details, Building, Walk-through, Section checks, Management, Risk rating, Action plan, Report. The side rail (tablet), the phone step bar (`.stepbar`: Overview, back, current step, Next), the Overview checklist and each screen's heading (`head()`) all read it, so numbering is the same everywhere. The old phone tab bar is gone.
+  - `progress()` gives each step `pct`, `done` and a plain-words `line`; the Overview and the job list cards show it. `readiness()` holds the pre-issue checks (used by the Report step and progress).
+  - Rarely needed detail sits in collapsible cards (`grp()`); open/closed state survives re-renders via `S.open` (and `S.openAct` for action cards), set by a capture-phase `toggle` listener.
   - Guided one-at-a-time checks (`guidedBlock`): swipe right = Yes and move on, swipe left = No and open the note. Swipe code sits just before `IN_PREVIEW` in `app.js`.
-  - Short option lists render as chips (`seg(..., "chips")`). The tests use a `pick()` helper for this.
+  - Short option lists render as chips (`seg(..., "chips")`). The tests use a `pick()` helper for this. Test photos `out/p0-2.jpg` are generated, not committed.
 - **Readiness checklist** (`viewReport`): a list of warnings, each of which jumps to the step concerned.
 - **Toast:** hidden with opacity and visibility (a v2.6.2 fix; sliding it alone left it stuck over the tab bar). Anything new that is fixed or positioned near the bottom must not cover the tab bar, and a `will-change` on cards has done this before.
 - **Service worker** cache name is `pfs-fra-<VERSION>`. Bump the version so phones pick up updates; an installed app needs opening twice to update.

@@ -31,7 +31,7 @@ with sync_playwright() as p:
     pg.click('.rail button[data-view="setup"]'); pick(pg,'#f_setup_buildingType','Block of flats (common parts)'); pg.wait_for_timeout(150)
     pick(pg,'#f_setup_flatsType','Purpose-built block'); pg.wait_for_timeout(100)
     pick(pg,'#f_setup_bs9792','Type 1'); pg.wait_for_timeout(100)
-    print("flats setup heading:", pg.locator('h3').all_inner_texts()[:3]); print("scope:", pg.inner_text('.note')[:140])
+    print("flats setup heading:", pg.locator('h3, .group summary strong').all_inner_texts()[:3]); print("scope:", pg.inner_text('.note')[:140])
     pg.screenshot(path=f"{OUT}/flats_setup.png", full_page=True)
     print("flats T1", counts(pg), qas(pg)[:4])
     pg.click('.rail button[data-view="building"]'); pg.wait_for_timeout(80); pg.screenshot(path=f"{OUT}/flats_building.png", full_page=True)

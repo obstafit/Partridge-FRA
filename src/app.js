@@ -387,14 +387,31 @@ function seg(path, options, cls = "") {
 }
 
 /* ---------------- views ---------------- */
-const NAV = [["home", "Overview", "0"], ["setup", "Setup", "1"], ["building", "Building", "2"], ["walk", "Walk-through", "3"], ["checks", "Section checks", "4"],
-  ["management", "Management", "5"], ["risk", "Risk rating", "6"], ["actions", "Action plan", "7"], ["report", "Sign-off & PDF", "8"]];
+/* The assessment is one linear flow of eight steps. This list drives the side rail (tablet), the step bar (phone),
+   the Overview checklist and the heading on every screen, so the numbering is the same everywhere. */
+const STEPS = [
+  ["setup", "Details", "before"], ["building", "Building", "before"],
+  ["walk", "Walk-through", "site"], ["checks", "Section checks", "site"], ["management", "Management", "site"],
+  ["risk", "Risk rating", "write"], ["actions", "Action plan", "write"], ["report", "Report", "write"]];
+const PHASES = { before: "Before you start", site: "On site", write: "Write-up" };
+const NAV = [["home", "Overview"], ...STEPS.map(([k, l]) => [k, l])];
+const stepNo = (k) => STEPS.findIndex(([s]) => s === k) + 1;
+const stepName = (k) => (NAV.find(([s]) => s === k) || [])[1] || "";
+function head(k, lead) { return `<header class="stephead"><p class="eyebrow">Step ${stepNo(k)} of ${STEPS.length}</p><h2 class="h">${esc(stepName(k))}</h2>${lead ? `<p class="muted lead">${lead}</p>` : ""}</header>`; }
+function nextBtn(k) { const n = STEPS[stepNo(k)]; return n ? `<div class="next"><button class="primary" data-act="nav" data-view="${n[0]}">Next: ${esc(n[1])} ${ico("next")}</button></div>` : ""; }
+/* A collapsible card. Its open/closed state survives re-renders (S.open, set by the toggle listener). */
+function grp(key, title, summary, body, def = false) {
+  const open = S.open?.[key] ?? def;
+  return `<details class="group" data-open="${key}"${open ? " open" : ""}><summary><span><strong>${esc(title)}</strong>${summary ? `<small>${summary}</small>` : ""}</span>${ico("next")}</summary><div class="groupbody">${body}</div></details>`;
+}
+function filled(paths) { const n = paths.filter((p) => String(getPath(S.job, p) ?? "").trim()).length; return n === paths.length ? `<b class="okc">✓ Complete</b>` : `${n} of ${paths.length} filled in`; }
+function withJob(j, fn) { const o = S.job; S.job = j; try { return fn(); } finally { S.job = o; } }
 
 function render() {
   const app = $("#app");
   if (!S.job || S.view === "jobs") { app.innerHTML = viewJobs(); bindCommon(); return; }
-  const v = { home: viewHome, setup: viewSetup, building: viewBuilding, walk: viewWalk, checks: viewChecks, management: viewManagement, risk: viewRisk, actions: viewActions, report: viewReport }[S.view] || viewSetup;
-  const pend = pendingFindings().length;
+  const v = { home: viewHome, setup: viewSetup, building: viewBuilding, walk: viewWalk, checks: viewChecks, management: viewManagement, risk: viewRisk, actions: viewActions, report: viewReport }[S.view] || viewHome;
+  const pr = progress(), i = stepNo(S.view), prev = i > 1 ? STEPS[i - 2] : null, next = STEPS[i] || null;
   app.innerHTML = `
   <div class="shell">
     <header class="top"><div class="topin">
@@ -402,34 +419,37 @@ function render() {
       <div class="jobtitle"><strong>${esc(S.job.setup.address || "New assessment")}</strong><span>${esc(S.job.setup.ref || "")}${S.job.example ? " · Example" : ""}</span></div>
       <span id="savestate" class="saved">Saved on this device</span>
     </div></header>
-    <nav class="rail" aria-label="Assessment steps">${NAV.map(([k, l, n]) => `<button data-act="nav" data-view="${k}" class="${S.view === k ? "on" : ""}"><i>${n}</i>${l}${k === "actions" && pend ? `<b class="badge">${pend}</b>` : ""}</button>`).join("")}</nav>
+    <nav class="rail" aria-label="Assessment steps">${NAV.map(([k, l]) => { const p = pr[k], n = stepNo(k);
+      return `<button data-act="nav" data-view="${k}" class="${S.view === k ? "on" : ""}${p?.done ? " done" : ""}"${S.view === k ? ' aria-current="page"' : ""}><i>${k === "home" ? ico("grid") : p?.done ? "✓" : n}</i><span>${l}</span>${k === "actions" && pr.pend ? `<b class="badge">${pr.pend}</b>` : ""}</button>`; }).join("")}</nav>
     <main class="main">${v()}</main>
-    ${(() => { /* phone tab bar: the five places used on site; setup, building, management and risk open from Home */
-      const TABS = [["home", "Home", "home", ["home", "setup", "building", "management"]], ["walk", "Walk", "walk", ["walk"]], ["checks", "Checks", "checks", ["checks"]],
-        ["actions", "Actions", "actions", ["risk", "actions"]], ["report", "Report", "report", ["report"]]];
-      return `<nav class="tabbar" aria-label="Main">${TABS.map(([k, l, ic, on]) => `<button data-act="nav" data-view="${k}" class="${on.includes(S.view) ? "on" : ""}"${on.includes(S.view) ? ' aria-current="page"' : ""}>${ico(ic)}<span>${l}</span>${k === "actions" && pend ? `<b class="dot">${pend}</b>` : ""}</button>`).join("")}</nav>`; })()}
+    <nav class="stepbar" aria-label="Steps">
+      <button data-act="nav" data-view="home" class="sb-home${S.view === "home" ? " on" : ""}">${ico("grid")}<span>Overview</span></button>
+      ${prev ? `<button data-act="nav" data-view="${prev[0]}" class="sb-prev" aria-label="Back to ${esc(prev[1])}">${ico("back")}</button>` : "<span></span>"}
+      <button data-act="nav" data-view="home" class="sb-now" aria-label="Show all steps"><small>${i ? `Step ${i} of ${STEPS.length}` : `${pr.done} of ${STEPS.length} steps done`}</small><strong>${esc(i ? stepName(S.view) : "Overview")}</strong><span class="sb-dots">${STEPS.map(([k]) => `<i class="${pr[k].done ? "d" : ""}${k === S.view ? " c" : ""}"></i>`).join("")}</span></button>
+      ${next ? `<button data-act="nav" data-view="${next[0]}" class="sb-next">${esc(next[1])} ${ico("next")}</button>` : "<span></span>"}
+    </nav>
   </div>`;
   bindCommon(); hydratePhotos();
   requestAnimationFrame(() => { document.querySelectorAll(".tabs button.on, .locpills button.on").forEach((b) => b.scrollIntoView({ inline: "center", block: "nearest" })); });
-
 }
 
 function viewJobs() {
   const list = S.jobs.slice().sort((a, b) => b.updated.localeCompare(a.updated));
   return `<div class="jobs">
-    <div class="brand"><div class="brandin"><div><p class="eyebrow">Partridge Fire Safety</p><h1>On-site fire risk assessment</h1>
-      <p class="lede">Works without signal. Jobs and photos are kept on this device until you export them.</p></div>
-      <button class="primary" data-act="new-job">New assessment</button></div></div>
+    <div class="brand"><div class="brandin"><div><p class="eyebrow">Partridge Fire Safety</p><h1>Fire risk assessments</h1>
+      <p class="lede">Works without signal. Jobs and photos stay on this device until you export them.</p></div>
+      <button class="primary" data-act="new-job">${ico("plus")} New assessment</button></div></div>
     <div class="jobsbody">
       <ul class="joblist">${list.length ? list.map((j) => {
-        const fs = j.locations.reduce((n, l) => n + l.items.length, 0);
+        let pr; try { pr = withJob(j, () => progress(j)); } catch { pr = { pct: 0, done: 0, next: "setup" }; }
         const rating = riskOf(j.risk.likelihood, j.risk.consequence);
         return `<li><button class="jobcard" data-act="open-job" data-id="${j.id}">
           <span class="jc-main"><strong>${esc(j.setup.address || "Untitled assessment")}</strong>
-          <span class="muted">${esc(j.setup.occType || j.setup.buildingType || "")}${j.setup.storeys ? " · " + esc(j.setup.storeys) + " storeys" : ""}</span></span>
-          <span class="jc-meta">${j.example ? `<em class="pill">Example</em>` : ""}${rating ? `<em class="pill r-${rating}">${rating}</em>` : ""}<span class="muted">${ukDate(j.setup.date)} · ${fs} items</span></span>
+          <span class="muted">${esc(j.setup.occType || j.setup.buildingType || "")}${j.setup.storeys ? " · " + esc(j.setup.storeys) + " storeys" : ""}${j.setup.date ? " · " + ukDate(j.setup.date) : ""}</span>
+          <span class="jc-prog"><span class="bar"><i style="width:${Math.round(pr.pct * 100)}%"></i></span><small>${pr.done === STEPS.length ? "All steps complete" : `${pr.done} of ${STEPS.length} steps done · next: ${esc(stepName(pr.next))}`}</small></span></span>
+          <span class="jc-meta">${j.example ? `<em class="pill">Example</em>` : ""}${rating ? `<em class="pill r-${rating}">${rating}</em>` : ""}${ico("next")}</span>
         </button></li>`; }).join("") : `<li class="empty">No assessments yet. Start one with New assessment.</li>`}</ul>
-      <div class="backup"><h2>Backup</h2><p class="muted">Export saves every job and photo to one file. Keep a copy off the tablet.</p>
+      <div class="backup"><h2>Backup</h2><p class="muted">Export saves every job and photo to one file. Keep a copy off the device.</p>
         <div class="row"><button data-act="export-all">Export all jobs</button><label class="btn"><input type="file" accept="application/json,.json" data-act-change="import" hidden>Import backup</label></div>
         ${Store.ok ? "" : `<p class="warn">This browser is not letting the app store data. Anything you enter will be lost when the page closes; export before leaving.</p>`}
       </div>
@@ -437,43 +457,48 @@ function viewJobs() {
 }
 
 function viewSetup() {
-  const s = "setup.";
-  return `<section class="pane"><h2 class="h"><i>1</i>Job setup</h2>
+  const s = "setup.", st = S.job.setup, prof = P(), u = units(), sc = scope();
+  const sub = prof.subtype.filter(([, , , show]) => !show || show(st));
+  const rpBody = (u ? `<div class="grid">${inp(s + "rpSame", "Same Responsible Person for all flats?", { options: ["Yes", "No"] })}</div>`
+      + (rpSame(st) ? u.slice(0, 1) : u).map((un, i) => { const k = s + "rp" + (i + 1); return `<h3>${rpSame(st) ? "All flats" : esc(un)}</h3><div class="grid">${inp(k, "Name", { wide: true })}${inp(k + "Status", "Status at date of assessment", { options: ["Landlord / owner", "Tenant", "Managing agent", "Other"] })}${inp(k + "Occ", rpSame(st) ? "Flats at date of assessment" : `${esc(un)} at date of assessment`, { options: ["Occupied", "Vacant", "Not known"] })}${inp(k + "Tel", "Telephone", { type: "tel" })}${inp(k + "Email", "Email", { type: "email" })}${inp(k + "Addr", "Address for service (if different)", { wide: true })}${inp(k + "Basis", "Basis on which identified", { wide: true })}</div>`; }).join("")
+      + `<h3>Managing agent or other Responsible Person (if any)</h3>` : "")
+    + `<div class="grid">${inp(s + "rp", u ? "Name (leave blank if none)" : "Name", { wide: true })}${inp(s + "rpTel", "Telephone", { type: "tel" })}${inp(s + "rpEmail", "Email", { type: "email" })}${inp(s + "rpBasis", "Basis on which identified", { wide: true })}${inp(s + "agent", "Managing agent (if different)", { wide: true })}</div>`;
+  const lic = prof.licensing && !sc.lodgers;
+  return `<section class="pane">${head("setup", "Only the first card is needed to start. The rest can be filled in at any time.")}
   <div class="grid">${inp(s + "address", "Premises address", { wide: true })}${inp(s + "postcode", "Postcode")}
   ${inp(s + "buildingType", "Building type", { options: ["HMO", "Block of flats (common parts)", "House converted into flats", "Commercial unit", "Industrial building", "Mixed use"] })}
-  ${inp(s + "ref", "Report reference")}${inp(s + "date", "Date of assessment", { type: "date" })}${inp(s + "review", "Next review due", { type: "date" })}
-  ${inp(s + "status", "Report status", { options: ["Draft", "Final", "Review"] })}</div>
-  <div class="fld wide"><span>Front elevation photo (report cover)</span>${photoStrip(S.job.cover?.photos, "cover:x")}</div>
-  ${/^(Commercial|Industrial|Mixed)/.test(S.job.setup.buildingType || "") ? `<p class="note">The PAS 79-1 profile for non-housing buildings is not built yet. For flats or an HMO above a shop, choose Flats or HMO and answer "Shop or other non-residential use" below.</p>` : ""}
-  <h3>${esc(P().subtypeLabel)}</h3><p class="muted">These set the benchmarks the app checks against.</p>
-  <div class="grid">${P().subtype.filter(([, , , show]) => !show || show(S.job.setup)).map(([k, label, opts], i) => inp(s + k, label, Array.isArray(opts) ? { options: opts, wide: i === 0 } : { inputmode: "numeric" })).join("")}
-  ${inp(s + "bs9792", "BS 9792 assessment type", { options: P().types || ["Type 1", "Type 2", "Type 3", "Type 4"] })}</div>${P().typesNote ? `<p class="muted small">${esc(P().typesNote)}</p>` : ""}
-  <p class="note"><strong>Scope.</strong> ${esc(scopeText())}${scope().cat ? ` <strong>Height:</strong> ${esc(scope().cat)} (Building Safety (Wales) Act 2026, provisional)${scope().h18 ? "; over 18 m checks added" : scope().h11 ? "; 11 m+ checks added" : ""}.` : ""}</p>
-  ${P().licensing && !scope().lodgers ? `<h3>Licensing</h3><div class="grid">${inp(s + "licence", "HMO licence number")}${inp(s + "licenceExp", "Licence expiry", { type: "date" })}${inp(s + "licenceHolder", "Licence holder")}${inp(s + "la", "Local authority")}${inp(s + "rsw", "Rent Smart Wales ref")}</div>` : ""}
-  ${units() ? `<h3>Responsible Person</h3><div class="grid">${inp(s + "rpSame", "Same Responsible Person for all flats?", { options: ["Yes", "No"] })}</div>` : ""}
-  ${units() ? (rpSame(S.job.setup) ? units().slice(0, 1) : units()).map((u, i) => { const k = s + "rp" + (i + 1); return `<h3>${rpSame(S.job.setup) ? "Responsible Person - all flats" : "Responsible Person - " + esc(u)}</h3><div class="grid">${inp(k, "Name", { wide: true })}${inp(k + "Status", "Status at date of assessment", { options: ["Landlord / owner", "Tenant", "Managing agent", "Other"] })}${inp(k + "Occ", rpSame(S.job.setup) ? "Flats at date of assessment" : `${esc(u)} at date of assessment`, { options: ["Occupied", "Vacant", "Not known"] })}${inp(k + "Tel", "Telephone", { type: "tel" })}${inp(k + "Email", "Email", { type: "email" })}${inp(k + "Addr", "Address for service (if different)", { wide: true })}${inp(k + "Basis", "Basis on which identified", { wide: true })}</div>`; }).join("") : ""}
-  <h3>${units() ? "Managing agent or other Responsible Person (if any)" : "Responsible Person"}</h3><div class="grid">${inp(s + "rp", units() ? "Name (leave blank if none)" : "Responsible Person", { wide: true })}${inp(s + "rpTel", "Telephone", { type: "tel" })}${inp(s + "rpEmail", "Email", { type: "email" })}${inp(s + "rpBasis", "Basis on which identified", { wide: true })}${inp(s + "agent", "Managing agent (if different)", { wide: true })}</div>
-  <h3>Visit</h3><div class="grid">${inp(s + "arrived", "Time arrived", { type: "time" })}${inp(s + "departed", "Time departed", { type: "time" })}${inp(s + "present", "Person present / access by")}${inp(s + "enforcer", "Enforcing authority")}
-  ${inp(s + "assessor", "Assessor")}${inp(s + "quals", "Qualifications")}${inp(s + "company", "Company")}${inp(s + "checker", "Report checked by")}</div>
-  <div class="next"><button class="primary" data-act="nav" data-view="building">Next: building</button></div></section>`;
+  ${sub.map(([k, label, opts], i) => inp(s + k, label, Array.isArray(opts) ? { options: opts, wide: i === 0 } : { inputmode: "numeric" })).join("")}
+  ${inp(s + "bs9792", "BS 9792 assessment type", { options: prof.types || ["Type 1", "Type 2", "Type 3", "Type 4"] })}</div>
+  ${/^(Commercial|Industrial|Mixed)/.test(st.buildingType || "") ? `<p class="note">The PAS 79-1 profile for non-housing buildings is not built yet. For flats or an HMO above a shop, choose Flats or HMO and answer "Shop or other non-residential use".</p>` : ""}
+  <p class="note"><strong>Scope.</strong> ${esc(scopeText())}${sc.cat ? ` <strong>Height:</strong> ${esc(sc.cat)} (Building Safety (Wales) Act 2026, provisional)${sc.h18 ? "; over 18 m checks added" : sc.h11 ? "; 11 m+ checks added" : ""}.` : ""}${prof.typesNote ? ` ${esc(prof.typesNote)}` : ""}</p>
+  ${grp("s-rp", "Responsible Person", rpNames() ? esc(rpNames()) : "Not added yet", rpBody, !rpNames())}
+  ${lic ? grp("s-lic", "HMO licensing", filled([s + "licence", s + "licenceExp", s + "licenceHolder", s + "la", s + "rsw"]), `<div class="grid">${inp(s + "licence", "HMO licence number")}${inp(s + "licenceExp", "Licence expiry", { type: "date" })}${inp(s + "licenceHolder", "Licence holder")}${inp(s + "la", "Local authority")}${inp(s + "rsw", "Rent Smart Wales ref")}</div>`) : ""}
+  ${grp("s-visit", "Visit", filled([s + "date", s + "arrived", s + "departed", s + "present", s + "enforcer"]), `<div class="grid">${inp(s + "date", "Date of assessment", { type: "date" })}${inp(s + "arrived", "Time arrived", { type: "time" })}${inp(s + "departed", "Time departed", { type: "time" })}${inp(s + "present", "Person present / access by")}${inp(s + "enforcer", "Enforcing authority")}</div>`)}
+  ${grp("s-report", "Report reference and assessor", `${esc(st.ref || "No reference yet")} · ${esc(st.assessor || "No assessor")}`, `<div class="grid">${inp(s + "ref", "Report reference")}${inp(s + "review", "Next review due", { type: "date" })}${inp(s + "assessor", "Assessor")}${inp(s + "quals", "Qualifications")}${inp(s + "company", "Company")}</div>`)}
+  ${nextBtn("setup")}</section>`;
 }
 
 function viewBuilding() {
-  const o = "overview.", bm = bench();
-  return `<section class="pane"><h2 class="h"><i>2</i>Building overview</h2>
+  const o = "overview.", bm = bench(), pr = P(), V = S.job.overview.vulnerable || {};
+  const picked = pr.vulnerable.map((g, i) => [g, i]).filter(([, i]) => V["v" + i]?.v === "Yes");
+  const none = pr.vulnerable.every((g, i) => V["v" + i]?.v === "No");
+  return `<section class="pane">${head("building")}
+  <div class="fld wide cover"><span>Front of the building (report cover photo)</span>${photoStrip(S.job.cover?.photos, "cover:x")}</div>
   <details class="bench"${window.innerWidth > 760 ? " open" : ""}><summary><h3>Benchmarks for this building</h3></summary>${bm.notes.map((n) => `<p class="note">${esc(n)}</p>`).join("")}
   <dl>${bm.lines.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>
   <p class="src">${S.job.profile !== "hmo" ? "BS 9792:2025; Approved Document B Vol 2 (Wales); LACORS Table C4; BS 5839-6:2019+A1:2020." : "LACORS Housing - Fire Safety case studies D4-D9 and Tables C4-C5; BS 5839-6:2019+A1:2020 Table 1."} Benchmarks are guidance for normal risk; go higher where the occupants or layout warrant it.</p></details>
   <h3>Construction</h3><div class="grid">${inp(o + "year", "Approx. year built")}${inp(o + "construction", "Main structure and walls", { wide: true })}
-  ${inp(o + "roof", "Roof")}${inp(o + "floors", "Floors")}${inp(o + "basement", "Basement / cellar", { options: ["No", "Yes"] })}${inp(o + "loft", "Loft conversion", { options: ["No", "Yes"] })}
-  ${inp(o + "sprinkler", "Sprinklers / suppression", { options: ["None", "Sprinklers BS 9251", "Sprinklers BS EN 12845", "Water mist", "Not known"] })}${inp(o + "cladding", "Cladding or attachments")}
-  ${inp(o + "layout", "Layout and common parts", { area: true })}${inp(o + "fires", "Fire history", { area: true, rows: 2 })}</div>
+  ${inp(o + "basement", "Basement / cellar", { options: ["No", "Yes"] })}${inp(o + "loft", "Loft conversion", { options: ["No", "Yes"] })}
+  ${inp(o + "sprinkler", "Sprinklers / suppression", { options: ["None", "Sprinklers BS 9251", "Sprinklers BS EN 12845", "Water mist", "Not known"] })}
+  ${inp(o + "layout", "Layout and common parts", { area: true })}</div>
+  ${grp("b-more", "More construction details", filled([o + "roof", o + "floors", o + "cladding", o + "fires"]), `<div class="grid">${inp(o + "roof", "Roof")}${inp(o + "floors", "Floors")}${inp(o + "cladding", "Cladding or attachments")}${inp(o + "fires", "Fire history", { area: true, rows: 2 })}</div>`)}
   <h3>Occupants</h3><div class="grid">${inp(o + "occupancy", "Occupancy type", { options: ["Permanent tenants", "Students", "Short-term / transient", "Supported or vulnerable tenants", "Mixed"] })}
-  ${inp(o + "sleep", "Sleeping risk", { options: ["Yes - all floors", "Yes - some floors", "No"] })}</div>
+  ${inp(o + "sleep", "Sleeping risk", { options: ["Yes - all floors", "Yes - some floors", "No"] })}
+  <div class="fld wide"><span>Vulnerable occupants: tap any that apply</span><div class="chipset vul">${pr.vulnerable.map((g, i) => `<button type="button" data-act="vul" data-i="${i}" class="${V["v" + i]?.v === "Yes" ? "on" : ""}">${esc(g)}</button>`).join("")}<button type="button" data-act="vulnone" class="${none ? "on" : ""}">None known</button></div></div>
+  ${picked.map(([g, i]) => inp(`overview.vulnerable.v${i}.n`, `${esc(g)}: notes and arrangements`, { wide: true })).join("")}</div>
   <h3>Inside the ${P().unit.many}</h3><div class="grid">${inp(o + "detInside", `Detection inside ${P().unit.many} confirmed by`, { options: [`Witnessed in ${P().unit.many} entered`, "Installer certificate", "Responsible Person statement", "Tenant confirmation", "Not confirmed"] })}
   ${inp(o + "roomsEntered", scope().rooms ? `${P().unit.Cap}s entered` : `${P().unit.Cap}s entered (none for this type)`, {})}</div>
-  <h3>Vulnerable persons</h3><div class="vlist">${P().vulnerable.map((g, i) => `<div class="vrow"><span>${esc(g)}</span>${seg(`overview.vulnerable.v${i}.v`, ["Yes", "No", "Not known"])}<input aria-label="Notes" placeholder="Notes" data-bind="overview.vulnerable.v${i}.n" value="${esc(getPath(S.job, `overview.vulnerable.v${i}.n`) || "")}"></div>`).join("")}</div>
-  <div class="next"><button class="primary" data-act="nav" data-view="walk">Next: walk-through</button></div></section>`;
+  ${nextBtn("building")}</section>`;
 }
 
 function viewWalk() {
@@ -481,7 +506,7 @@ function viewWalk() {
   if (!S.loc || !locs.find((l) => l.id === S.loc)) S.loc = locs[0]?.id || null;
   const loc = locs.find((l) => l.id === S.loc);
   const sc = scope(), qa = P().quickAdds.filter((q) => (!q.nonHousing || S.showAll) && shown(q.when, sc));
-  return `<section class="pane walk"><h2 class="h"><i>3</i>Walk-through</h2>
+  return `<section class="pane walk">${head("walk", "Add each location as you reach it, then tap what you find there.")}
   <div class="walkgrid">
     <aside class="locs"><h3>Locations</h3>
       <ul>${locs.map((l) => { const f = l.items.filter((it) => itemResult(it) !== "Pass").length; return `<li><button data-act="loc" data-id="${l.id}" class="${l.id === S.loc ? "on" : ""}"><span>${esc(l.name)}${l.area === "Letting" ? ` <em class="pill">${P().unit.Cap}</em>` : ""}</span><small>${esc(l.floor)} · ${l.items.length}${f ? ` · <b class="neg">${f} to act</b>` : ""}</small></button></li>`; }).join("")}</ul>
@@ -551,6 +576,7 @@ const ICON = {
   sign: '<rect x="3" y="6" width="18" height="10" rx="1.5"/><path d="M7 11h6M11 8l3 3-3 3"/>',
   bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
+  grid: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
   back: '<path d="M15 5l-7 7 7 7"/>', next: '<path d="M9 5l7 7-7 7"/>', list: '<path d="M4 6h16M4 12h16M4 18h16"/>', cards: '<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 5V3h8v2"/>'
 };
 const QA_ICON = { door: "door", flatdoor: "door", hold: "door", detector: "detector", alarm: "bell", el: "light", travel: "ruler", escape: "route", stairs: "stairs", extstair: "stairs",
@@ -558,39 +584,56 @@ const QA_ICON = { door: "door", flatdoor: "door", hold: "door", detector: "detec
 const QA_SHORT = { flatdoor: "Flat door", detector: "Alarm", el: "Light", travel: "Travel", escape: "Route", exit: "Exit", comb: "Storage", firestop: "Fire stopping", unit: "Inside flat", sample: "Sample", extstair: "Ext. stair" };
 const ico = (k, cls = "") => `<svg class="ico ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k] || ""}</svg>`;
 
-/* ---------------- job home: progress at a glance and "carry on" ---------------- */
+/* ---------------- job overview: progress through the eight steps ---------------- */
+/* Each step: pct (0-1, drives the bars), done (ticked), line (what is left, in plain words). */
 function progress(job = S.job) {
-  const st = job.setup, cl = checkList(job), ans = cl.filter((c) => job.checks[c.key]?.v).length, no = cl.filter((c) => job.checks[c.key]?.v === "No").length;
+  const st = job.setup, prof = PROFILES[job.profile || "hmo"], cl = checkList(job);
+  const msec = (dsecs(job).find((s) => s.management) || {}).n;
+  const cks = cl.filter((c) => c.sec !== msec), mck = cl.filter((c) => c.sec === msec);
+  const ans = (l) => l.filter((c) => job.checks[c.key]?.v).length;
+  const no = cks.filter((c) => job.checks[c.key]?.v === "No").length;
   const items = job.locations.reduce((a, l) => a + l.items.length, 0), fails = job.locations.reduce((a, l) => a + l.items.filter((it) => itemResult(it) !== "Pass").length, 0);
-  const setupNeed = ["address", "date", "bs9792"].filter((k) => !st[k]).length + (st[P().subtypeKey] ? 0 : 1) + (rpNames(job) ? 0 : 1);
-  const docs = P().documents.filter((d, i) => job.docs?.["d" + i]?.s).length;
-  const r = riskOf(job.risk.likelihood, job.risk.consequence), pend = pendingFindings().length;
-  return {
-    setup: { pct: 1 - setupNeed / 5, line: setupNeed ? `${setupNeed} key detail${setupNeed > 1 ? "s" : ""} to add` : "Done" },
-    building: { pct: (job.overview.construction ? 0.5 : 0) + (job.overview.layout ? 0.5 : 0), line: job.overview.construction ? "Construction recorded" : "Construction and layout" },
+  const miss = [!st.address && "address", !st[prof.subtypeKey] && prof.subtypeLabel.toLowerCase(), !rpNames(job) && "Responsible Person", !st.date && "date"].filter(Boolean);
+  const bNeed = [["construction", job.overview.construction], ["layout", job.overview.layout], ["occupancy", job.overview.occupancy]]
+    .concat(prof.needsUnitDetection(st) ? [[`detection inside the ${prof.unit.many}`, job.overview.detInside]] : []);
+  const bMiss = bNeed.filter(([, v]) => !v).map(([k]) => k);
+  const docs = prof.documents.filter((d, i) => job.docs?.["d" + i]?.s).length, mTot = prof.documents.length + mck.length, mDone = docs + ans(mck);
+  const r = riskOf(job.risk.likelihood, job.risk.consequence), pend = pendingFindings().length, fnd = findings().length;
+  const inc = job.actions.filter((a) => !a.priority || !a.basis || !(a.action || "").trim()).length;
+  const warn = readiness().length;
+  const out = {
+    setup: { pct: 1 - miss.length / 4, line: miss.length ? `Add the ${miss.join(", ")}` : "Done" },
+    building: { pct: 1 - bMiss.length / bNeed.length, line: bMiss.length ? `Add the ${bMiss.join(", ")}` : "Done" },
     walk: { pct: items ? 1 : 0, line: items ? `${items} item${items > 1 ? "s" : ""} in ${job.locations.length} location${job.locations.length > 1 ? "s" : ""}${fails ? ` · ${fails} to act on` : ""}` : "Nothing recorded yet" },
-    checks: { pct: cl.length ? ans / cl.length : 0, line: `${ans}/${cl.length} answered${no ? ` · ${no} deficienc${no > 1 ? "ies" : "y"}` : ""}` },
-    management: { pct: P().documents.length ? docs / P().documents.length : 0, line: `${docs}/${P().documents.length} documents recorded` },
-    risk: { pct: r ? (job.risk.justification ? 1 : 0.6) : 0, line: r ? `${r}${job.risk.justification ? "" : " · add justification"}` : "Not rated yet" },
-    actions: { pct: pend ? 0.5 : job.actions.length ? 1 : (findings().length ? 0 : 1), line: pend ? `${pend} finding${pend > 1 ? "s" : ""} to add` : `${job.actions.length} action${job.actions.length === 1 ? "" : "s"}` },
-    report: { pct: 0, line: "Make the PDF" }
+    checks: { pct: cks.length ? ans(cks) / cks.length : 0, line: `${ans(cks)} of ${cks.length} answered${no ? ` · ${no} deficienc${no > 1 ? "ies" : "y"}` : ""}` },
+    management: { pct: mTot ? mDone / mTot : 1, line: mDone === mTot ? "Done" : `${docs} of ${prof.documents.length} documents · ${ans(mck)} of ${mck.length} checks` },
+    risk: { pct: r ? (job.risk.justification ? 1 : 0.6) : 0, line: r ? (job.risk.justification ? r : `${r} · add your reasons`) : "Not rated yet" },
+    actions: { pct: pend || inc ? 0.5 : (job.actions.length || (fnd === 0 && ans(cks) > 0)) ? 1 : 0,
+      line: pend ? `${pend} finding${pend > 1 ? "s" : ""} to add to the plan` : inc ? `${inc} action${inc > 1 ? "s" : ""} to finish` : job.actions.length ? `${job.actions.length} action${job.actions.length > 1 ? "s" : ""}` : "No findings yet" },
+    report: { pct: warn ? Math.max(0.1, 1 - warn / 15) : 1, line: warn ? `${warn} thing${warn > 1 ? "s" : ""} to check before issue` : "Ready to issue" }
   };
-}
-function ring(p, size = 54) {
-  const r = (size - 8) / 2, c = 2 * Math.PI * r, v = Math.max(0, Math.min(1, p));
-  return `<svg class="ring" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true"><circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="var(--line)" stroke-width="6"/><circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${v >= 1 ? "var(--ok)" : "var(--accent)"}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${c * v} ${c}" transform="rotate(-90 ${size / 2} ${size / 2})"/><text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" font-size="${size / 4.2}" font-weight="700" fill="currentColor">${Math.round(v * 100)}%</text></svg>`;
+  STEPS.forEach(([k]) => { out[k].done = out[k].pct >= 1; });
+  out.done = STEPS.filter(([k]) => out[k].done).length;
+  out.pct = STEPS.reduce((a, [k]) => a + Math.min(1, out[k].pct), 0) / STEPS.length;
+  out.next = (STEPS.find(([k]) => !out[k].done) || ["report"])[0];
+  out.pend = pend; out.findings = fnd;
+  return out;
 }
 function viewHome() {
-  const pr = progress(), steps = NAV.filter(([k]) => k !== "home");
-  const order = ["setup", "building", "walk", "checks", "management", "risk", "actions", "report"];
-  const nextK = order.find((k) => pr[k].pct < 1 && k !== "report") || "report";
-  const overall = order.slice(0, 7).reduce((a, k) => a + Math.min(1, pr[k].pct), 0) / 7;
-  const st = S.job.setup, r = riskOf(S.job.risk.likelihood, S.job.risk.consequence);
+  const pr = progress(), st = S.job.setup, r = riskOf(S.job.risk.likelihood, S.job.risk.consequence);
+  const nk = pr.next, all = pr.done === STEPS.length;
+  const photos = Object.keys(S.job.photoMeta || {}).length;
+  let lastPh;
   return `<section class="pane home">
-    ${S.storeWarn ? `<div class="storewarn" role="alert"><span>${esc(S.storeWarn)}</span><button type="button" class="ghost" data-act="export-job">Export backup</button><button type="button" class="ghost" data-act="dismiss-warn" aria-label="Dismiss">✕</button></div>` : ""}<div class="hero"><div class="herotxt"><p class="eyebrow">${esc(P().title)}${st.bs9792 ? " · " + esc(st.bs9792) : ""}</p><h2>${esc(st.address || "New assessment")}</h2>
-      <p class="muted">${esc(st.ref || "No reference yet")}${st.date ? " · " + esc(ukDate(st.date)) : ""}${r ? ` · <em class="pill r-${r}">${r}</em>` : ""}</p></div>${ring(overall, 72)}</div>
-    <button class="primary carry" data-act="nav" data-view="${nextK}">${ico(nextK)}<span><small>Carry on</small>${esc(NAV.find(([k]) => k === nextK)[1])}: ${esc(pr[nextK].line)}</span>${ico("next")}</button>
-    <div class="tiles">${steps.map(([k, l]) => `<button class="tile${pr[k].pct >= 1 ? " done" : ""}" data-act="nav" data-view="${k}">${ico(k, "big")}<strong>${esc(l)}</strong><small>${esc(pr[k].line)}</small><span class="bar"><i style="width:${Math.round(Math.min(1, pr[k].pct) * 100)}%"></i></span></button>`).join("")}</div>
+    ${S.storeWarn ? `<div class="storewarn" role="alert"><span>${esc(S.storeWarn)}</span><button type="button" class="ghost" data-act="export-job">Export backup</button><button type="button" class="ghost" data-act="dismiss-warn" aria-label="Dismiss">✕</button></div>` : ""}
+    <div class="hero"><div class="herotxt"><p class="eyebrow">${esc(P().title)}${st.bs9792 ? " · " + esc(st.bs9792) : ""}</p><h2>${esc(st.address || "New assessment")}</h2>
+      <p class="muted">${esc(st.ref || "No reference yet")}${st.date ? " · " + esc(ukDate(st.date)) : ""}</p></div>
+      ${r ? `<em class="pill r-${r}">${r}</em>` : ""}
+      <div class="hprog"><div class="hbar"><i style="width:${Math.round(pr.pct * 100)}%"></i></div><small><b>${pr.done} of ${STEPS.length} steps complete</b> · ${Math.round(pr.pct * 100)}%</small></div></div>
+    <button class="primary carry" data-act="nav" data-view="${nk}">${ico(nk)}<span><small>${all ? "All steps complete" : `Continue · step ${stepNo(nk)}`}</small>${esc(stepName(nk))}: ${esc(pr[nk].line)}</span>${ico("next")}</button>
+    <div class="stats"><div><b>${pr.findings}</b><small>Deficienc${pr.findings === 1 ? "y" : "ies"}</small></div><div><b>${S.job.actions.length}</b><small>Action${S.job.actions.length === 1 ? "" : "s"}</small></div><div><b>${photos}</b><small>Photo${photos === 1 ? "" : "s"}</small></div></div>
+    <ol class="steplist">${STEPS.map(([k, l, ph], i) => { const p = pr[k], h = ph !== lastPh ? `<li class="phase">${PHASES[ph]}</li>` : ""; lastPh = ph;
+      return `${h}<li><button class="step${p.done ? " done" : p.pct > 0 ? " part" : ""}${k === nk && !all ? " nextup" : ""}" data-act="nav" data-view="${k}"><span class="sn">${p.done ? "✓" : i + 1}</span><span class="st"><strong>${esc(l)}</strong><small>${esc(p.line)}</small>${!p.done && p.pct > 0 ? `<span class="bar"><i style="width:${Math.round(p.pct * 100)}%"></i></span>` : ""}</span>${ico("next")}</button></li>`; }).join("")}</ol>
   </section>`;
 }
 
@@ -627,7 +670,7 @@ function viewChecks() {
   const secs = dsecs().filter((s) => !s.management);
   if (!secs.find((s) => s.n === S.sec)) S.sec = secs[0].n;
   if (S.guided == null) S.guided = window.innerWidth <= 760;
-  return `<section class="pane"><h2 class="h"><i>4</i>Section checks</h2>
+  return `<section class="pane">${head("checks")}
   <div class="tabs">${secs.map((s) => { const st = secStatus(s); return `<button data-act="sec" data-n="${s.n}" class="${S.sec === s.n ? "on" : ""}">${s.n}. ${esc(s.title)}<small>${st}</small></button>`; }).join("")}</div>
   <div class="modeswitch" role="group" aria-label="View"><button class="${S.guided ? "on" : ""}" data-act="gmode" data-on="1">${ico("cards")} One at a time</button><button class="${S.guided ? "" : "on"}" data-act="gmode" data-on="0">${ico("list")} Whole list</button></div>
   ${S.guided ? guidedBlock(secs.find((s) => s.n === S.sec)) : checksBlock(secs.find((s) => s.n === S.sec))}</section>`;
@@ -656,51 +699,56 @@ function checksBlock(s) {
 
 function viewManagement() {
   const m = dsecs().find((s) => s.management);
-  return `<section class="pane"><h2 class="h"><i>4</i>Management</h2><p class="muted">Usually done with the Responsible Person at the start or end of the visit.</p>
-  <h3>Documents provided by the Responsible Person</h3>
-  <div class="docs">${P().documents.map((d, i) => [d, i]).filter(([d]) => !(scope().lodgers && /licen/i.test(d))).map(([d, i]) => `<div class="docrow"><span>${esc(d)}</span>${seg(`docs.d${i}.s`, ["Sighted", "Not sighted", "N/A"])}<input aria-label="Date or reference" placeholder="Date or reference" data-bind="docs.d${i}.ref" value="${esc(getPath(S.job, `docs.d${i}.ref`) || "")}"><div class="dphoto">${photoStrip(getPath(S.job, `docs.d${i}.photos`), "doc:d" + i)}</div></div>`).join("")}</div>
-  <div class="grid">${inp("docsOther", "Other documents or information (or stated as not available)", { area: true, rows: 2 })}${inp("notAccessed", "Areas not accessible or not inspected", { area: true, rows: 2 })}</div>
-  ${m ? `<h3>${m.n}. ${esc(m.title)}</h3>${checksBlock(m)}` : `<div class="next"><button class="primary" data-act="nav" data-view="risk">Next: risk rating</button></div>`}</section>`;
+  return `<section class="pane">${head("management", "Usually done with the Responsible Person at the start or end of the visit.")}
+  <h3>Documents from the Responsible Person</h3><p class="muted small">Mark each one. For documents you saw, add the date or reference and a photo if useful.</p>
+  <div class="docs">${P().documents.map((d, i) => [d, i]).filter(([d]) => !(scope().lodgers && /licen/i.test(d))).map(([d, i]) => { const r = S.job.docs?.["d" + i] || {};
+    return `<div class="docrow"><span>${esc(d)}</span>${seg(`docs.d${i}.s`, ["Sighted", "Not sighted", "N/A"])}${r.s === "Sighted" ? `<input aria-label="Date or reference" placeholder="Date or reference" data-bind="docs.d${i}.ref" value="${esc(r.ref || "")}"><div class="dphoto">${photoStrip(r.photos, "doc:d" + i)}</div>` : ""}</div>`; }).join("")}</div>
+  ${grp("m-other", "Other documents and areas not inspected", filled(["docsOther", "notAccessed"]), `<div class="grid">${inp("docsOther", "Other documents or information (or stated as not available)", { area: true, rows: 2 })}${inp("notAccessed", "Areas not accessible or not inspected", { area: true, rows: 2 })}</div>`)}
+  ${m ? `<h3>${m.n}. ${esc(m.title)}</h3>${checksBlock(m)}` : ""}
+  ${nextBtn("management")}</section>`;
 }
 
 function viewRisk() {
-  const r = S.job.risk; const rating = riskOf(r.likelihood, r.consequence);
-  const res = riskOf(r.resLike, r.resCons);
-  return `<section class="pane"><h2 class="h"><i>5</i>Risk rating</h2><p class="muted">BS 9792:2025 risk level estimator.</p>
-  <div class="riskq"><h3>Likelihood of fire</h3>${seg("risk.likelihood", ["Low", "Medium", "High"], "big")}
-  <p class="muted">Low = abnormally low for this type of premises. Medium = typical. High = serious shortcomings in the control of fire hazards.</p></div>
-  <div class="riskq"><h3>Likely consequences</h3>${seg("risk.consequence", CONS, "big")}
-  <p class="muted">Slight = serious injury or death unlikely. Moderate = serious injury possible, multiple fatalities unlikely. Extreme = one or more occupants likely to be seriously injured or killed.</p></div>
-  <div class="matrix" role="table" aria-label="Risk matrix"><div class="mh"></div>${CONS.map((c) => `<div class="mh">${c}</div>`).join("")}
-  ${Object.entries(MATRIX).map(([l, row]) => `<div class="mh">${l}</div>${row.map((v, i) => `<div class="mc r-${v}${r.likelihood === l && r.consequence === CONS[i] ? " sel" : ""}">${v}</div>`).join("")}`).join("")}</div>
-  <div class="result ${rating ? "r-" + rating : ""}">Overall fire risk: <strong>${rating || "choose likelihood and consequence"}</strong></div>
-  <div class="grid">${inp("risk.justification", "Assessor justification", { area: true })}${inp("risk.departures", "Departures from standards accepted, with reasons", { area: true })}</div>
-  <h3>After the action plan is completed</h3><div class="grid">${inp("risk.resLike", "Residual likelihood", { options: ["Low", "Medium", "High"] })}${inp("risk.resCons", "Residual consequence", { options: CONS })}
-  <div class="fld"><span>Predicted residual rating</span><div class="pillout">${res ? `<em class="pill r-${res}">${res}</em>` : "-"}</div></div></div>
-  <label class="tick"><input type="checkbox" data-bind-check="risk.seriousInformed"${r.seriousInformed ? " checked" : ""}> Serious risk to persons identified: the Responsible Person was informed before I left the premises.</label>
-  <div class="next"><button class="primary" data-act="nav" data-view="actions">Next: action plan</button></div></section>`;
+  const r = S.job.risk, rating = riskOf(r.likelihood, r.consequence), res = riskOf(r.resLike, r.resCons);
+  const opt = (path, list) => `<div class="seg choice" role="group">${list.map(([v, d]) => `<button type="button" data-act="seg" data-path="${path}" data-val="${esc(v)}" class="${getPath(S.job, path) === v ? "on" : ""}"><strong>${esc(v)}</strong><small>${esc(d)}</small></button>`).join("")}</div>`;
+  const f = findings().length, hi = S.job.actions.filter((a) => a.priority === "H").length;
+  const matrix = `<div class="matrix" role="table" aria-label="Risk matrix"><div class="mh"></div>${CONS.map((c) => `<div class="mh">${c}</div>`).join("")}
+    ${Object.entries(MATRIX).map(([l, row]) => `<div class="mh">${l}</div>${row.map((v, i) => `<div class="mc r-${v}${r.likelihood === l && r.consequence === CONS[i] ? " sel" : ""}">${v}</div>`).join("")}`).join("")}</div>`;
+  return `<section class="pane">${head("risk", `Two choices give the overall rating (BS 9792:2025 risk level estimator). So far: ${f} deficienc${f === 1 ? "y" : "ies"} recorded${hi ? `, ${hi} high priority` : ""}.`)}
+  <h3>1. How likely is a fire?</h3>${opt("risk.likelihood", [["Low", "Unusually low for this type of building"], ["Medium", "Typical for this type of building"], ["High", "Serious shortcomings in controlling fire hazards"]])}
+  <h3>2. How serious would the consequences be?</h3>${opt("risk.consequence", [["Slight harm", "Serious injury or death unlikely"], ["Moderate harm", "Serious injury possible; multiple deaths unlikely"], ["Extreme harm", "One or more occupants likely to be seriously injured or killed"]])}
+  <div class="result ${rating ? "r-" + rating : ""}"><small>Overall fire risk</small><strong>${rating || "Make both choices above"}</strong>${rating ? `<span>${esc(RISK_KEY[rating])}</span>` : ""}</div>
+  <div class="grid">${inp("risk.justification", "Why this rating? (printed in the report)", { area: true })}</div>
+  ${/^(Substantial|Intolerable)$/.test(rating) || r.seriousInformed ? `<label class="tick"><input type="checkbox" data-bind-check="risk.seriousInformed"${r.seriousInformed ? " checked" : ""}> Serious risk to persons identified: the Responsible Person was informed before I left the premises.</label>` : ""}
+  ${grp("r-more", "Departures and residual risk", res ? `Residual risk after actions: ${res}` : filled(["risk.departures", "risk.resLike", "risk.resCons"]), `<div class="grid">${inp("risk.departures", "Departures from standards accepted, with reasons", { area: true })}${inp("risk.resLike", "Residual likelihood", { options: ["Low", "Medium", "High"] })}${inp("risk.resCons", "Residual consequence", { options: CONS })}<div class="fld"><span>Predicted residual rating</span><div class="pillout">${res ? `<em class="pill r-${res}">${res}</em>` : "-"}</div></div></div>`)}
+  ${grp("r-matrix", "Show the risk matrix", "", matrix)}
+  ${nextBtn("risk")}</section>`;
 }
 
 function viewActions() {
-  const pend = pendingFindings();
-  const pri = P().priorities;
-  return `<section class="pane"><h2 class="h"><i>5</i>Action plan</h2>
-  <p class="muted">Priority: ${pri.map((p) => `${p.k} = ${p.label} (${p.time.toLowerCase()})`).join(" · ")}. Basis: L = legal requirement${scope().joint ? ` (${scope().law})` : " under the Order"}, G = good practice.</p>
-  ${pend.length ? `<div class="pending"><strong>${pend.length} new finding${pend.length > 1 ? "s" : ""}</strong> from the walk-through and checks are not in the plan yet.<button class="primary" data-act="draft-actions">Add to the plan</button></div>` : ""}
-  <ol class="actions">${S.job.actions.map((a, i) => `<li class="action">
-    <div class="ahead"><b>${i + 1}</b><span class="tag">Ref ${esc(a.ref)}</span><span class="lbl">Priority</span>${seg(`actions.${i}.priority`, ["H", "M", "L"], "pri")}<span class="lbl">Basis</span>${seg(`actions.${i}.basis`, ["L", "G"])}<button class="ghost libsave" data-act="libsave" data-i="${i}" aria-label="Save to My findings">☆ Save</button><button class="ghost danger" data-act="del-action" data-i="${i}">Remove</button></div>
-    <div class="grid">${inp(`actions.${i}.deficiency`, "Deficiency identified", { area: true, rows: 2 })}${inp(`actions.${i}.action`, "Action required", { area: true, rows: 2 })}
-    ${inp(`actions.${i}.who`, "Responsible Person")}${inp(`actions.${i}.target`, "Target date")}${inp(`actions.${i}.closed`, "Date closed")}</div>
-    ${a.photos?.length ? `<div class="photos">${a.photos.map((id) => `<button type="button" class="thumb" data-act="photo-view" data-id="${id}"><img data-photo="${id}" alt=""></button>`).join("")}</div>` : ""}
-  </li>`).join("") || `<li class="empty">No actions yet. Findings marked No, and walk-through items that fail, can be added here.</li>`}</ol>
-  <div class="row"><button class="primary" data-act="libopen">${ico("list")} Add from My findings</button><button data-act="add-action">Add an action by hand</button></div>
-  <h3>Interim measures</h3><p class="muted">Where an action cannot be completed quickly, record what is in place until it is.</p>
-  <ol class="actions">${S.job.interim.map((m, i) => `<li class="action"><div class="grid">${inp(`interim.${i}.ref`, "Action ref")}${inp(`interim.${i}.measure`, "Interim measure", { area: true, rows: 2 })}${inp(`interim.${i}.who`, "Responsible Person")}${inp(`interim.${i}.date`, "Date in place")}</div><button class="ghost danger" data-act="del-interim" data-i="${i}">Remove</button></li>`).join("")}</ol>
-  <div class="row"><button data-act="add-interim">Add interim measure</button></div>
-  <div class="next"><button class="primary" data-act="nav" data-view="report">Next: sign-off</button></div></section>`;
+  const pend = pendingFindings(), pri = P().priorities;
+  const due = (a) => a.target || ({ H: "within 1 month", M: "within 3 months", L: "within 12 months" }[a.priority] || "");
+  const first = (t) => (t || "").replace(/\s+/g, " ").trim().slice(0, 120);
+  S.openAct = S.openAct || {};
+  return `<section class="pane">${head("actions", `Priority: ${pri.map((p) => `<b>${p.k}</b> ${p.time.toLowerCase()}`).join(" · ")}. Basis: <b>L</b> legal requirement${scope().joint ? ` (${esc(scope().law)})` : ""}, <b>G</b> good practice.`)}
+  ${pend.length ? `<div class="pending"><span><strong>${pend.length} new finding${pend.length > 1 ? "s" : ""}</strong> from the walk-through and checks ${pend.length > 1 ? "are" : "is"} not in the plan yet.</span><button class="primary" data-act="draft-actions">Add to the plan</button></div>` : ""}
+  ${S.job.actions.length ? `<ol class="actions">${S.job.actions.map((a, i) => { const inc = !a.priority || !a.basis || !(a.action || "").trim(), open = S.openAct[a.src] ?? inc;
+    return `<li class="action${inc ? " inc" : ""}"><details data-acts="${esc(a.src)}"${open ? " open" : ""}><summary><b class="anum">${i + 1}</b><em class="lpri lpri-${a.priority || "x"}">${a.priority || "?"}</em><span class="atxt"><strong>${esc(first(a.deficiency) || "New action")}</strong><small>${a.ref ? `Ref ${esc(a.ref)} · ` : ""}${inc ? "Needs a priority, basis and action" : `${a.basis === "L" ? "Legal requirement" : "Good practice"} · ${esc(due(a))}`}</small></span>${ico("next")}</summary>
+    <div class="abody">
+      <div class="ahead"><span class="lbl">Priority</span>${seg(`actions.${i}.priority`, ["H", "M", "L"], "pri")}<span class="lbl">Basis</span>${seg(`actions.${i}.basis`, ["L", "G"])}</div>
+      <div class="grid">${inp(`actions.${i}.deficiency`, "Deficiency found", { area: true, rows: 2 })}${inp(`actions.${i}.action`, "Action required", { area: true, rows: 2 })}</div>
+      <details class="amore"><summary>Responsible Person, target date and date closed</summary><div class="grid">${inp(`actions.${i}.who`, "Responsible Person")}${inp(`actions.${i}.target`, "Target date (blank = by priority)")}${inp(`actions.${i}.closed`, "Date closed")}</div></details>
+      ${a.photos?.length ? `<div class="photos">${a.photos.map((id) => `<button type="button" class="thumb" data-act="photo-view" data-id="${id}"><img data-photo="${id}" alt=""></button>`).join("")}</div>` : ""}
+      <div class="arow"><button class="ghost libsave" data-act="libsave" data-i="${i}">☆ Save to My findings</button><button class="ghost danger" data-act="del-action" data-i="${i}">Remove</button></div>
+    </div></details></li>`; }).join("")}</ol>`
+    : `<div class="empty">No actions yet. Answers of No in the checks, and walk-through items that fail, are offered here to add.</div>`}
+  <div class="row"><button class="primary" data-act="libopen">${ico("list")} Add from My findings</button><button data-act="add-action">${ico("plus")} Write an action</button></div>
+  ${grp("a-interim", "Interim measures", S.job.interim.length ? `${S.job.interim.length} recorded` : "Only needed where an action can't be done quickly", `<ol class="actions">${S.job.interim.map((m, i) => `<li class="action pad"><div class="grid">${inp(`interim.${i}.ref`, "Action ref")}${inp(`interim.${i}.measure`, "Interim measure", { area: true, rows: 2 })}${inp(`interim.${i}.who`, "Responsible Person")}${inp(`interim.${i}.date`, "Date in place")}</div><button class="ghost danger" data-act="del-interim" data-i="${i}">Remove</button></li>`).join("")}</ol><div class="row"><button data-act="add-interim">${ico("plus")} Add interim measure</button></div>`, S.job.interim.length > 0)}
+  ${nextBtn("actions")}</section>`;
 }
 
-function viewReport() {
+/* Everything worth checking before the report is issued (Report step and the Overview). */
+function readiness() {
   const rating = riskOf(S.job.risk.likelihood, S.job.risk.consequence);
   const unanswered = checkList().filter((c) => !S.job.checks[c.key]?.v).length;
   const pend = pendingFindings().length;
@@ -749,19 +797,31 @@ function viewReport() {
   const blankAct = S.job.actions.filter((a) => !a.priority || !a.basis || !(a.action || "").trim()).length;
   if (blankAct) warn.push(`${blankAct} action${blankAct > 1 ? "s have" : " has"} no priority, basis or action text (Action plan screen).`);
   if (unanswered) warn.push(`${unanswered} section checks are unanswered (printed with no answer ticked).`);
-  return `<section class="pane"><h2 class="h"><i>5</i>Sign-off and PDF</h2>
-  ${(() => { const where = (w) => /Section checks|section checks|unanswered/.test(w) ? "checks" : /Action plan|action plan|action/i.test(w) && !/risk/i.test(w) ? "actions" : /risk|Rated|rating/i.test(w) ? "risk" : /Management|documents/i.test(w) ? "management" : /Building/.test(w) ? "building" : /Setup|address|Time arrived|Top floor|storeys/i.test(w) ? "setup" : /walk-through|locations/i.test(w) ? "walk" : "";
-    return warn.length ? `<div class="ready"><h3>${warn.length} thing${warn.length > 1 ? "s" : ""} to sort before issuing</h3><ul>${warn.map((w) => { const v = where(w); return `<li>${v ? `<button data-act="nav" data-view="${v}"><span class="x">!</span><span>${esc(w)}</span>${ico("next")}</button>` : `<div class="noj"><span class="x">!</span><span>${esc(w)}</span></div>`}</li>`; }).join("")}</ul></div>`
-      : `<div class="ready ok"><h3>✓ Ready to issue</h3><p class="muted">All the checks the app can make are complete. Read the PDF through before sending it.</p></div>`; })()}
-  <div class="grid">${inp("setup.reportDate", "Date of report", { type: "date" })}${inp("setup.review", "Review due", { type: "date" })}${inp("setup.checker", "Report checked by")}${inp("setup.checkerQuals", "Checker qualifications")}</div>
+  return warn;
+}
+
+/* Which step fixes a readiness warning. */
+function warnStep(w) { return /Section checks|section checks|unanswered/.test(w) ? "checks" : /Action plan|action plan|action/i.test(w) && !/risk/i.test(w) ? "actions" : /risk|Rated|rating/i.test(w) ? "risk" : /Management|documents/i.test(w) ? "management" : /Building/.test(w) ? "building" : /Setup|address|Time arrived|Top floor|storeys/i.test(w) ? "setup" : /walk-through|locations/i.test(w) ? "walk" : /report/i.test(w) ? "report" : ""; }
+function viewReport() {
+  const warn = readiness(), by = {};
+  warn.forEach((w) => { const k = warnStep(w) || "report"; (by[k] = by[k] || []).push(w); });
+  const list = STEPS.filter(([k]) => by[k]).map(([k, l]) => `<p class="rgrp">${esc(l)}</p><ul>${by[k].map((w) => k === "report" ? `<li><div class="noj"><span class="x">!</span><span>${esc(w)}</span></div></li>` : `<li><button data-act="nav" data-view="${k}"><span class="x">!</span><span>${esc(w)}</span>${ico("next")}</button></li>`).join("")}</ul>`).join("");
+  return `<section class="pane">${head("report")}
+  ${warn.length ? `<div class="ready"><h3>${warn.length} thing${warn.length > 1 ? "s" : ""} to check before you issue</h3><p class="muted small">You can make a draft PDF at any time. Tap an item to go to it.</p>${list}</div>`
+    : `<div class="ready ok"><h3>✓ Ready to issue</h3><p class="muted">All the checks the app can make are complete. Read the PDF through before sending it.</p></div>`}
+  <div class="grid">${inp("setup.status", "Report status", { options: ["Draft", "Final", "Review"] })}${inp("setup.reportDate", "Date of report", { type: "date" })}${inp("setup.review", "Review due", { type: "date" })}${inp("setup.checker", "Report checked by")}${inp("setup.checkerQuals", "Checker qualifications")}</div>
   <label class="tick"><input type="checkbox" data-bind-check="setup.scopeExplained"${S.job.setup.scopeExplained ? " checked" : ""}> Scope and limitations explained to the person present and to the Responsible Person.</label>
-  <div class="row big"><button class="primary" data-act="pdf">Create PDF report</button><button data-act="export-job">Export this job</button></div>
-  <p class="muted">The PDF follows the Partridge report layout: cover, sections with observations, walk-through findings, risk rating, action plan, photo appendix and declaration.</p>
-  <h3>Delete</h3><button class="ghost danger" data-act="del-job">Delete this assessment from the tablet</button></section>`;
+  <div class="row big"><button class="primary" data-act="pdf">${ico("report")} Create PDF report</button><button data-act="export-job">Export this job</button></div>
+  <p class="muted small">The PDF follows the Partridge report layout: cover, sections with observations, walk-through findings, risk rating, action plan, photo appendix and declaration.</p>
+  ${grp("rep-del", "Delete this assessment", "", `<p class="muted small">This removes the job and its photos from this device. Export it first if you may need it.</p><button class="ghost danger" data-act="del-job">Delete this assessment</button>`)}</section>`;
 }
 
 /* ---------------- events ---------------- */
 function bindCommon() {}
+/* Keep collapsible cards open or closed across re-renders. toggle does not bubble, so listen in the capture phase. */
+document.addEventListener("toggle", (e) => { const d = e.target; if (!d.dataset) return;
+  if (d.dataset.open) { S.open = S.open || {}; S.open[d.dataset.open] = d.open; }
+  if (d.dataset.acts) { S.openAct = S.openAct || {}; S.openAct[d.dataset.acts] = d.open; } }, true);
 
 document.addEventListener("input", (e) => {
   const t = e.target;
@@ -826,7 +886,7 @@ document.addEventListener("click", async (e) => {
     const li = b.closest(".check"); if (li) { li.classList.toggle("isno", getPath(S.job, b.dataset.path) === "No");
       if (getPath(S.job, b.dataset.path) === "No") { li.querySelector(".ckobs")?.classList.remove("hide"); li.querySelector(".addnote")?.remove(); li.querySelector("textarea")?.focus(); } }
     if (b.dataset.path === "setup.buildingType") { switchProfile(S.job, profileFor(getPath(S.job, b.dataset.path))); render(); }
-    else if (/^(risk\.|setup\.|overview\.basement|sf\.)/.test(b.dataset.path)) render(); else if (S.view === "checks" || S.view === "management") { const t = $(".tabs button.on small"); if (t) t.textContent = secStatus(dsecs().find((s) => s.n === S.sec) || {}); } }
+    else if (/^(risk\.|setup\.|overview\.basement|sf\.|docs\.|actions\.\d+\.(priority|basis))/.test(b.dataset.path)) render(); else if (S.view === "checks" || S.view === "management") { const t = $(".tabs button.on small"); if (t) t.textContent = secStatus(dsecs().find((s) => s.n === S.sec) || {}); } }
   if (a === "loc") { S.loc = b.dataset.id; render(); }
   if (a === "shownote") { const t = document.getElementById(b.dataset.id); t?.parentElement.classList.remove("hide"); b.remove(); t?.focus(); }
   if (a === "locsheet") {
@@ -852,6 +912,9 @@ document.addEventListener("click", async (e) => {
   if (a === "qseg") { const inpt = b.closest(".qf").querySelector("input[type=hidden]"); const on = inpt.value === b.dataset.val; inpt.value = on ? "" : b.dataset.val;
     b.parentElement.querySelectorAll("button").forEach((x) => x.classList.toggle("on", !on && x === b)); }
   if (a === "close-sheet") closeSheet();
+  if (a === "vul") { const k = "v" + b.dataset.i, V = S.job.overview.vulnerable = S.job.overview.vulnerable || {}; V[k] = Object.assign(V[k] || {}, { v: V[k]?.v === "Yes" ? "" : "Yes" }); save(); render(); }
+  if (a === "vulnone") { const V = S.job.overview.vulnerable = S.job.overview.vulnerable || {}, all = P().vulnerable.every((g, i) => V["v" + i]?.v === "No");
+    P().vulnerable.forEach((g, i) => { V["v" + i] = Object.assign(V["v" + i] || {}, { v: all ? "" : "No" }); }); save(); render(); }
   if (a === "dismiss-warn") { S.storeWarn = ""; render(); }
   if (a === "del-item") { confirmThen(b, "Tap again to delete", () => { const loc = S.job.locations.find((l) => l.id === b.dataset.loc); loc.items = loc.items.filter((i) => i.id !== b.dataset.id); closeSheet(); save(); render(); }); }
   if (a === "dictate") dictate(b);

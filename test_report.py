@@ -8,7 +8,7 @@ with sync_playwright() as p:
     b=p.chromium.launch(); pg=b.new_context(viewport={"width":1180,"height":900},accept_downloads=True,timezone_id="Europe/London").new_page()
     pg.on("pageerror",lambda e: errs.append(str(e)))
     pg.goto("http://127.0.0.1:8771/index.html"); pg.wait_for_selector(".jobcard"); pg.click(".jobcard"); pg.evaluate("() => { S.view = \'setup\'; render(); }")
-    pg.fill('#f_setup_ref','PFS002'); pg.dispatch_event('#f_setup_ref','input')
+    pg.evaluate("()=>{S.open={'s-report':true};render()}"); pg.fill('#f_setup_ref','PFS002'); pg.dispatch_event('#f_setup_ref','input')
     pg.click('.rail button[data-view="walk"]'); pg.wait_for_timeout(100)
     pg.locator('[data-act="qa-edit"]').first.click(); pg.wait_for_timeout(150)
     pg.set_input_files('.sheet input[type=file]', [f"{OUT}/p0.jpg", f"{OUT}/p1.jpg", f"{OUT}/p2.jpg"]); pg.wait_for_timeout(1500)

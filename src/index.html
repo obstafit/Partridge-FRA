@@ -431,6 +431,94 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
 /* toast: fully hidden when not showing (sliding alone left it visible above the tab bar) */
 #toast{opacity:0;visibility:hidden;pointer-events:none;transform:translate(-50%,16px);transition:opacity .2s,transform .2s,visibility 0s linear .2s}
 #toast.show{opacity:1;visibility:visible;pointer-events:auto;transform:translate(-50%,0);transition:opacity .2s,transform .2s,visibility 0s}
+
+/* =====================================================================
+   v2.7 usability pass: one linear flow of eight steps, a real progress overview,
+   collapsible cards for detail that is rarely needed, and a step bar on phones.
+   ===================================================================== */
+.stephead{display:grid;gap:2px;margin:4px 2px 4px} .stephead .eyebrow{color:var(--accent-ink)} .stephead .h{padding:0 2px!important}
+.stephead .lead{margin:4px 2px 0;font-size:.92rem;line-height:1.45}
+.h i{display:none}
+/* side rail (tablet) */
+.rail button{display:flex;gap:10px;align-items:center}
+.rail button i{width:26px;height:26px;font-size:.8rem;font-weight:700;color:var(--muted);font-family:var(--font-body)} .rail button i .ico{width:15px;height:15px}
+.rail button.done i{background:var(--ok-soft);color:var(--ok)} .rail button.on i{background:var(--accent);color:#fff}
+/* overview */
+.home .hero{display:grid!important;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;align-items:start}
+.home .hero .pill{margin-top:4px}
+.hprog{grid-column:1/-1;display:grid;gap:6px;margin-top:10px}
+.hbar{height:10px;border-radius:99px;background:var(--field);overflow:hidden} .hbar i{display:block;height:100%;background:var(--accent);border-radius:99px;min-width:10px}
+.hprog small{color:var(--muted)} .hprog b{color:var(--fg)}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.stats div{background:var(--surface);border-radius:16px;box-shadow:var(--shadow);padding:10px 8px;display:grid;gap:0;text-align:center}
+.stats b{font-size:1.4rem;font-weight:750} .stats small{color:var(--muted);font-size:.76rem;font-weight:600}
+.steplist{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.steplist .phase{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;margin:10px 4px 0}
+.step{width:100%;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;justify-content:stretch;text-align:left;background:var(--surface);box-shadow:var(--shadow);border-radius:16px;padding:12px 14px;min-height:64px}
+.step .sn{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-weight:750;background:var(--field);color:var(--muted)}
+.step.part .sn{background:var(--accent-soft);color:var(--accent-ink)} .step.done .sn{background:var(--ok);color:#fff}
+.step.nextup{box-shadow:0 0 0 2px var(--accent),var(--shadow)}
+.step .st{display:grid;gap:3px;min-width:0} .step strong{font-weight:650} .step small{color:var(--muted);font-weight:500;line-height:1.3}
+.step .bar{margin-top:4px;height:4px} .step>.ico{color:var(--muted)}
+/* job list */
+.jobcard{align-items:center;flex-wrap:nowrap!important;gap:12px} .jc-main{flex:1}
+.jc-prog{display:grid;gap:4px;margin-top:8px} .jc-prog .bar{height:6px;max-width:280px} .jc-prog small{color:var(--muted);font-weight:500}
+.jc-meta{flex-direction:column;align-items:flex-end!important} .jc-meta .ico{color:var(--muted)}
+/* collapsible cards */
+.group{background:var(--surface);border-radius:18px;box-shadow:var(--shadow);overflow:hidden}
+.group>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;justify-content:space-between;padding:14px 16px;min-height:60px}
+.group>summary::-webkit-details-marker{display:none}
+.group>summary span{display:grid;gap:2px;min-width:0} .group>summary small{color:var(--muted);font-weight:500;overflow-wrap:anywhere}
+.group>summary .ico{flex:none;transition:transform .15s;color:var(--muted)} .group[open]>summary .ico{transform:rotate(90deg)}
+.groupbody{padding:0 0 6px;border-top:1px solid var(--line)} .groupbody>.grid,.groupbody .grid{box-shadow:none!important}
+.groupbody h3{margin:12px 16px 0} .groupbody>p,.groupbody>.row,.groupbody>button{margin-left:16px;margin-right:16px}
+.groupbody .actions{padding:10px 12px 0}
+.okc{color:var(--ok)}
+.cover{background:var(--surface);border-radius:18px;box-shadow:var(--shadow);padding:14px}
+.chipset.vul button{text-align:left;min-height:42px;height:auto;padding:8px 14px;line-height:1.25}
+/* risk */
+.seg.choice{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;background:transparent;padding:0;width:100%}
+.seg.choice button{display:grid;align-content:start;justify-items:start;gap:4px;text-align:left;padding:12px 14px;min-height:84px;background:var(--surface);box-shadow:var(--shadow);border-radius:14px!important;border:2px solid transparent!important;color:var(--fg)}
+.seg.choice button small{font-weight:500;color:var(--muted);font-size:.82rem;line-height:1.3}
+.seg.choice button.on{background:var(--accent-soft);border-color:var(--accent)!important;box-shadow:none;color:var(--fg)}
+.result{display:grid;gap:2px;border:0!important;border-radius:16px;margin-top:6px} .result small{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;opacity:.75}
+.result strong{font-size:1.5rem;line-height:1.2} .result span{font-size:.9rem}
+.groupbody .matrix{margin:12px 14px}
+/* action plan */
+.action{padding:0!important;gap:0!important} .action.pad{padding:12px!important;gap:10px!important}
+.action>details>summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px 14px;min-height:64px}
+.action>details>summary::-webkit-details-marker{display:none}
+.action>details>summary>.ico{color:var(--muted);transition:transform .15s} .action>details[open]>summary>.ico{transform:rotate(90deg)}
+.anum{font-weight:750;color:var(--muted);min-width:18px}
+.atxt{display:grid;gap:2px;min-width:0} .atxt strong{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .atxt small{color:var(--muted)}
+.action.inc .atxt small{color:var(--accent-ink);font-weight:600}
+.abody{display:grid;gap:10px;padding:0 12px 12px} .abody .grid{box-shadow:none;padding:0}
+.amore>summary{cursor:pointer;color:var(--accent-ink);font-weight:600;min-height:40px;display:flex;align-items:center}
+.arow{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.pending span{flex:1 1 200px}
+/* report */
+.ready .x{background:var(--warn-soft);color:#8a5a00}
+.rgrp{margin:14px 2px 6px;font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700}
+.seg.choice button{display:flex!important;flex-direction:column;align-items:flex-start;justify-content:flex-start;text-align:left}
+.seg.choice button strong,.seg.choice button small{display:block;width:100%;text-align:left}
+.abody .ahead{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 10px;align-items:center} .abody .ahead .seg{justify-self:start} .abody .ahead .lbl{margin:0}
+/* phone step bar (replaces the old tab bar) */
+.stepbar{display:none}
+@media (max-width:760px){
+  .tabbar{display:none!important}
+  .stepbar{position:fixed;left:0;right:0;bottom:0;z-index:12;display:grid;grid-template-columns:58px 44px minmax(0,1fr) auto;gap:4px;align-items:center;
+    padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));
+    background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:saturate(1.6) blur(14px);-webkit-backdrop-filter:saturate(1.6) blur(14px);border-top:1px solid var(--line)}
+  .stepbar button{background:transparent;box-shadow:none;min-height:52px;padding:0 4px}
+  .sb-home{flex-direction:column;gap:2px;font-size:.66rem;color:var(--muted)} .sb-home.on{color:var(--accent)} .sb-home .ico{width:22px;height:22px}
+  .sb-prev{color:var(--fg)}
+  .sb-now{display:grid!important;justify-items:center;align-content:center;gap:1px;min-width:0} .sb-now small{font-size:.68rem;color:var(--muted);font-weight:600}
+  .sb-now strong{font-size:.92rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .sb-dots{display:flex;gap:4px;margin-top:3px} .sb-dots i{width:6px;height:6px;border-radius:50%;background:var(--line-strong)} .sb-dots i.d{background:var(--ok)} .sb-dots i.c{background:var(--accent);width:14px;border-radius:3px}
+  .stepbar .sb-next{background:var(--accent);color:#fff;border-radius:12px;font-size:.88rem;padding:0 10px 0 14px;max-width:150px;white-space:nowrap;overflow:hidden}
+  .seg.choice{grid-template-columns:minmax(0,1fr)} .seg.choice button{min-height:0}
+  .stats b{font-size:1.2rem}
+}
 </style>
 <div id="app"><div class="jobsbody"><p class="muted">Loading assessments…</p></div></div>
 <!--JSPDF-->

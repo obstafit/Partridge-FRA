@@ -10,7 +10,7 @@ with sync_playwright() as p:
     pg.on("pageerror",lambda e: errs.append(str(e)))
     pg.goto("http://127.0.0.1:8795/index.html"); pg.wait_for_selector(".jobcard"); pg.click(".jobcard"); pg.wait_for_timeout(200)
     print("persist asked:", pg.evaluate("()=>S.persisted"))
-    pg.click('.tabbar button[data-view="checks"]'); pg.wait_for_timeout(200)
+    pg.evaluate("()=>{S.view='checks';render()}"); pg.wait_for_timeout(200)
     # find an unanswered check and open library
     pg.click('.gmore [data-act="libopen"]'); pg.wait_for_timeout(200)
     first=pg.locator('.libpick strong').first.inner_text(); print("top suggestion for this check:", first, "| check:", pg.evaluate("()=>{const c=checkList().filter(c=>c.sec===S.sec)[S.gi];return c.text}"))
@@ -20,11 +20,11 @@ with sync_playwright() as p:
     pg.locator('.liblist li:not([hidden]) .libpick').first.click(); pg.wait_for_timeout(300)
     pg.screenshot(path=f"{OUT}/lib_card.png")
     key=pg.evaluate("()=>Object.keys(S.job.checks).find(k=>S.job.checks[k].act)"); print("check set:", pg.evaluate("(k)=>S.job.checks[k]",key))
-    pg.click('.tabbar button[data-view="actions"]'); pg.wait_for_timeout(200)
+    pg.evaluate("()=>{S.view='actions';render()}"); pg.wait_for_timeout(200)
     pg.click('[data-act="draft-actions"]'); pg.wait_for_timeout(200)
     a=pg.evaluate("(k)=>S.job.actions.find(a=>a.src==='check:'+k)",key); print("drafted action:", a["action"][:70], a["priority"], a["basis"])
     # save an action to My findings, then reload and confirm it persists
-    pg.evaluate("()=>{S.job.actions[0].action='Test custom wording for my library.'; S.job.actions[0].priority='M'; render();}")
+    pg.evaluate("()=>{S.job.actions[0].action='Test custom wording for my library.'; S.job.actions[0].priority='M'; S.openAct={[S.job.actions[0].src]:true}; render();}")
     pg.click('[data-act="libsave"][data-i="0"]'); pg.wait_for_timeout(300)
     pg.click('[data-act="libopen"]:not([data-key])'); pg.wait_for_timeout(200)
     print("mine first:", pg.locator('.libpick small').first.inner_text()[:40], "| has delete:", pg.locator('.libdel').count())
