@@ -37,6 +37,8 @@ function photoRegister(job) {
     out.push({ id, loc: meta[id]?.loc || `${l.floor}, ${l.name}${itemTitle(it) ? " - " + itemTitle(it) : ""}`, act: actNo((a) => a.src === "item:" + it.id || (a.photos || []).includes(id)) || (sp ? `Obs ${itemDsec(it)}` : ""),
       shows: meta[id]?.cap || `${sp?.label || "Item"}${pr.length ? ": " + pr[0] + (pr.length > 1 ? ` (+${pr.length - 1} more)` : "") : ""}`, taken: meta[id]?.taken });
   })));
+  /* General photos of a location (walk-through camera button). */
+  job.locations.forEach((l) => (l.photos || []).forEach((id) => out.push({ id, loc: meta[id]?.loc || `${l.floor}, ${l.name}`, act: "", shows: meta[id]?.cap || `General view: ${l.name}`, taken: meta[id]?.taken })));
   checkList(job).forEach((c) => (job.checks[c.key]?.photos || []).forEach((id) => out.push({ id, loc: meta[id]?.loc || `Check ${c.ref}`,
     act: actNo((a) => a.src === "check:" + c.key || (a.photos || []).includes(id)) || `Obs ${c.ref}`, shows: meta[id]?.cap || (job.checks[c.key].obs || c.text).slice(0, 90), taken: meta[id]?.taken })));
   Object.entries(job.docs || {}).forEach(([k, v]) => (v.photos || []).forEach((id) => out.push({ id, loc: "Documents", act: "",

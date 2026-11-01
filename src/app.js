@@ -130,7 +130,7 @@ function normalise(j) {
     Object.entries(v).forEach(([b, x]) => { if (x && typeof x === "object") { const k = a + "." + b; j.checks[k] = Object.assign({}, j.checks[k] || {}, Object.fromEntries(Object.entries(x).filter(([, y]) => y !== "" && y != null))); } });
     delete j.checks[a]; } }); j.docs = j.docs || {}; j.risk = j.risk || {}; j.actions = Array.isArray(j.actions) ? j.actions : [];
   j.interim = Array.isArray(j.interim) ? j.interim : []; j.conclusions = j.conclusions || {}; j.locations = Array.isArray(j.locations) ? j.locations : [];
-  j.locations.forEach((l) => { l.items = Array.isArray(l.items) ? l.items : []; l.items.forEach((it) => { it.f = it.f || {}; it.photos = it.photos || []; }); });
+  j.locations.forEach((l) => { l.items = Array.isArray(l.items) ? l.items : []; l.photos = Array.isArray(l.photos) ? l.photos : []; l.items.forEach((it) => { it.f = it.f || {}; it.photos = it.photos || []; }); });
   j.cover = j.cover || {}; j.photoMeta = j.photoMeta || {}; j.sf = j.sf || {};
   /* Jobs saved before the Cottrell Road order: move conclusions and action refs to the new section numbers. */
   if (!j.layout2) {
@@ -526,30 +526,52 @@ function viewBuilding() {
   ${nextBtn("building")}</section>`;
 }
 
+const FLOORS = ["Basement", "Ground floor", "First floor", "Second floor", "Third floor", "Fourth floor", "Fifth floor", "Loft", "External"];
+/* Inspection categories offered in the walk-through for this job (depends on profile and BS 9792 type). */
+function walkQA() { const sc = scope(); return P().quickAdds.filter((q) => (!q.nonHousing || S.showAll) && shown(q.when, sc)); }
+const toAct = (l) => l.items.filter((it) => /^(Fail|Review)$/.test(itemResult(it))).length;
+/* Every photo for a location: general photos taken on arrival plus photos on its items. */
+const locPhotos = (l) => [...(l.photos || []), ...l.items.flatMap((it) => it.photos || [])];
 function viewWalk() {
   const locs = S.job.locations;
   if (!S.loc || !locs.find((l) => l.id === S.loc)) S.loc = locs[0]?.id || null;
-  const loc = locs.find((l) => l.id === S.loc);
-  const sc = scope(), qa = P().quickAdds.filter((q) => (!q.nonHousing || S.showAll) && shown(q.when, sc));
-  return `<section class="pane walk">${head("walk", "Add each location as you reach it, then tap what you find there.")}
+  const loc = locs.find((l) => l.id === S.loc), qa = walkQA();
+  const floors = FLOORS.filter((f) => locs.some((l) => l.floor === f)).concat([...new Set(locs.map((l) => l.floor))].filter((f) => !FLOORS.includes(f)));
+  const fl = loc?.floor, photos = loc ? locPhotos(loc) : [];
+  /* Category card: Pass (green), Fail (red), Review (amber) or Not assessed (grey) for this location. */
+  const cat = (q) => { const its = loc.items.filter((it) => it.k === q.k), rs = its.map(itemResult);
+    const st = !its.length ? ["na", "Not assessed"] : rs.includes("Fail") ? ["fail", "Fail"] : rs.includes("Review") ? ["rev", "Review"] : ["pass", rs.every((r) => r === "Note only") ? "Noted" : "Pass"];
+    return `<button class="qabtn cat cat-${st[0]}" data-act="qa" data-k="${q.k}">${ico(QA_ICON[q.k] || "plus")}<span class="cl">${esc(QA_SHORT[q.k] || q.label)}</span><em class="cs">${its.length > 1 ? its.length + " · " : ""}${st[1]}</em></button>`; };
+  const fails = loc ? loc.items.filter((it) => itemResult(it) === "Fail").length : 0, revs = loc ? loc.items.filter((it) => itemResult(it) === "Review").length : 0;
+  return `<section class="pane walk">${head("walk")}
   <div class="walkgrid">
     <aside class="locs"><h3>Locations</h3>
-      <ul>${locs.map((l) => { const f = l.items.filter((it) => itemResult(it) !== "Pass").length; return `<li><button data-act="loc" data-id="${l.id}" class="${l.id === S.loc ? "on" : ""}"><span>${esc(l.name)}${l.area === "Letting" ? ` <em class="pill">${P().unit.Cap}</em>` : ""}</span><small>${esc(l.floor)} · ${l.items.length}${f ? ` · <b class="neg">${f} to act</b>` : ""}</small></button></li>`; }).join("")}</ul>
-      <form class="addloc" data-form="addloc"><select id="nl_floor" aria-label="Floor">${["Basement", "Ground floor", "First floor", "Second floor", "Third floor", "Fourth floor", "Fifth floor", "Loft", "External"].map((f) => `<option>${f}</option>`).join("")}</select>
+      <ul>${locs.map((l) => { const f = toAct(l); return `<li><button data-act="loc" data-id="${l.id}" class="${l.id === S.loc ? "on" : ""}"><span>${esc(l.name)}${l.area === "Letting" ? ` <em class="pill">${P().unit.Cap}</em>` : ""}</span><small>${esc(l.floor)} · ${l.items.length}${f ? ` · <b class="neg">${f} to act</b>` : ""}</small></button></li>`; }).join("")}</ul>
+      <form class="addloc" data-form="addloc"><select id="nl_floor" aria-label="Floor">${FLOORS.map((f) => `<option>${f}</option>`).join("")}</select>
       <select id="nl_area" aria-label="Area"><option>Common part</option><option value="Letting"${scope().rooms ? "" : " disabled"}>${P().unit.Cap}</option></select>
       <input id="nl_name" placeholder="Room or area, e.g. Landing" aria-label="Location name" required><button class="primary">Add location</button>
       ${scope().rooms ? "" : `<p class="muted small">${esc(scope().type)}: ${P().unit.many} are not entered. Record ${P().unit.one} entrance doors from the common side.</p>`}</form>
     </aside>
     <div class="locbody">${loc ? `
-      <div class="locpills" role="tablist" aria-label="Locations">${locs.map((l) => { const f = l.items.filter((it) => itemResult(it) !== "Pass").length; return `<button role="tab" aria-selected="${l.id === S.loc}" class="${l.id === S.loc ? "on" : ""}" data-act="loc" data-id="${l.id}"><small>${esc(l.floor)}</small>${esc(l.name)}${f ? `<b class="dot">${f}</b>` : ""}</button>`; }).join("")}<button class="addpill" data-act="locsheet" aria-label="Add a location">${ico("plus")}</button></div>
-      <div class="lochead"><div><p class="eyebrow">${esc(loc.floor)}</p><h3>${esc(loc.name)}</h3></div><button class="ghost danger" data-act="del-loc" data-id="${loc.id}">Remove location</button></div>
-      <div class="qa">${qa.filter((q) => q.front).map((q) => `<button class="qabtn" data-act="qa" data-k="${q.k}">${ico(QA_ICON[q.k] || "plus")}<span>${esc(QA_SHORT[q.k] || q.label)}</span></button>`).join("")}
-        <details class="more"><summary>More items</summary><div class="qa">${qa.filter((q) => !q.front).map((q) => `<button class="qabtn" data-act="qa" data-k="${q.k}">+ ${esc(q.label)}</button>`).join("")}
-        <label class="tog"><input type="checkbox" data-act-change="showall"${S.showAll ? " checked" : ""}> Show non-housing items</label></div></details></div>
+      <div class="floorpills" role="tablist" aria-label="Floors">${floors.map((f) => { const n = locs.filter((l) => l.floor === f).reduce((a, l) => a + toAct(l), 0);
+        return `<button role="tab" aria-selected="${f === fl}" class="${f === fl ? "on" : ""}" data-act="floor" data-floor="${esc(f)}">${esc(f)}${n ? `<b class="dot">${n}</b>` : ""}</button>`; }).join("")}</div>
+      <div class="locpills" role="tablist" aria-label="Locations on this floor">${locs.filter((l) => l.floor === fl).map((l) => `<button role="tab" aria-selected="${l.id === S.loc}" class="${l.id === S.loc ? "on" : ""}" data-act="loc" data-id="${l.id}">${esc(l.name)}${toAct(l) ? `<b class="dot">${toAct(l)}</b>` : ""}</button>`).join("")}<button class="addpill" data-act="locsheet" aria-label="Add a location">${ico("plus")}<span>Location</span></button></div>
+      <div class="lochero">
+        <div class="lh-top"><div><p class="eyebrow">${esc(loc.floor)}${loc.area === "Letting" ? " · " + P().unit.Cap : ""}</p><h3>${esc(loc.name)}</h3></div><span class="lh-count" title="Photos for this location">${ico("camera")}${photos.length}</span></div>
+        ${photos.length ? `<div class="lh-photos">${photos.map((id) => `<button type="button" class="thumb" data-act="photo-view" data-id="${id}" aria-label="View photo"><img data-photo="${id}" alt=""></button>`).join("")}</div>`
+          : `<p class="muted small">No photos here yet. Tap Photos to take a few as you arrive, then record what you find.</p>`}
+        <p class="lh-sum">${loc.items.length ? `${loc.items.length} item${loc.items.length > 1 ? "s" : ""} recorded${fails ? ` · <b class="c-fail">${fails} fail</b>` : ""}${revs ? ` · <b class="c-rev">${revs} to review</b>` : ""}` : "Nothing recorded yet"}</p>
+      </div>
+      <div class="qa cats" lang="en-GB">${qa.filter((q) => q.front).map(cat).join("")}</div>
+      <details class="more"><summary>More categories</summary><div class="qa cats" lang="en-GB">${qa.filter((q) => !q.front).map(cat).join("")}</div>
+        <label class="tog"><input type="checkbox" data-act-change="showall"${S.showAll ? " checked" : ""}> Show non-housing items</label></details>
+      ${loc.items.length ? `<h3>Recorded here</h3>` : ""}
       <ul class="items">${loc.items.map((it) => { const r = itemResult(it), sp = itemSpec(it), pr = itemProblems(it); return `<li class="item r-${r}">
         <button class="itemmain" data-act="qa-edit" data-id="${it.id}"><span class="tag">${esc(sp?.label)}</span><strong>${esc(itemTitle(it) || sp?.label)}</strong>
-        <span class="muted">${pr.length ? esc(pr.join("; ")) : "No deficiencies recorded"}</span></button><span class="res">${r}</span></li>`; }).join("") || `<li class="empty">Nothing recorded here yet. Tap an item above as you come to it.</li>`}</ul>
-      <div class="next"><button data-act="nav" data-view="checks">Section checks</button></div>` : `<div class="empty big">Add the first location to start the walk-through. Record doors, detectors and lights as you pass them.</div>`}
+        <span class="muted">${pr.length ? esc(pr.join("; ")) : "No deficiencies recorded"}${it.photos?.length ? ` · ${it.photos.length} photo${it.photos.length > 1 ? "s" : ""}` : ""}</span></button><span class="res">${r}</span></li>`; }).join("")}</ul>
+      <div class="walkbar"><label class="wb-cam"><input type="file" accept="image/*" capture="environment" multiple data-photo-for="loc:${loc.id}" hidden>${ico("camera")}<span>Photos</span></label><button class="primary wb-add" data-act="addfinding">${ico("plus")} Add finding</button></div>
+      <button class="ghost danger dl" data-act="del-loc" data-id="${loc.id}">Remove this location</button>
+      ${nextBtn("walk")}` : `<div class="empty big">Add the first location to start the walk-through. Record doors, alarms and lights as you reach them.<div class="row" style="justify-content:center"><button class="primary" data-act="locsheet">${ico("plus")} Add the first location</button></div></div>`}
     </div></div></section>`;
 }
 
@@ -872,6 +894,7 @@ document.addEventListener("change", async (e) => {
   if (t.dataset.photoFor) {
     const [kind, id] = t.dataset.photoFor.split(":");
     if (kind === "item") { const it = sheetItem; if (it) { await addPhotos(t.files, it); const strip = t.closest(".qf"); strip.innerHTML = `<span>Photos</span>${photoStrip(it.photos, "item:" + it.id)}`; hydratePhotos(strip); } }
+    if (kind === "loc") { const l = S.job.locations.find((x) => x.id === id); if (l) { l.photos = l.photos || []; await addPhotos(t.files, l); render(); toast(`${t.files.length} photo${t.files.length > 1 ? "s" : ""} added to ${l.name}`); } }
     if (kind === "cover") { const c = S.job.cover = S.job.cover || {}; c.photos = []; await addPhotos([t.files[0]], c); render(); }
     if (kind === "doc") { const d = S.job.docs[id] = S.job.docs[id] || {}; await addPhotos(t.files, d); render(); }
     if (kind === "check") { const c = S.job.checks[id] = S.job.checks[id] || {}; await addPhotos(t.files, c); S.gnote = true; render(); }
@@ -940,6 +963,10 @@ document.addEventListener("click", async (e) => {
   if (a === "qseg") { const inpt = b.closest(".qf").querySelector("input[type=hidden]"); const on = inpt.value === b.dataset.val; inpt.value = on ? "" : b.dataset.val;
     b.parentElement.querySelectorAll("button").forEach((x) => x.classList.toggle("on", !on && x === b)); }
   if (a === "close-sheet") closeSheet();
+  if (a === "floor") { const l = S.job.locations.find((x) => x.floor === b.dataset.floor); if (l) { S.loc = l.id; render(); } }
+  if (a === "addfinding") { const l = S.job.locations.find((x) => x.id === S.loc); if (!l) return;
+    openSheet(`<div class="sheet" role="dialog" aria-modal="true" aria-label="Add finding"><div class="sheetin"><div class="sheethead"><h3>Add finding</h3><span class="muted">${esc(l.floor)} · ${esc(l.name)}</span><button type="button" class="ghost" data-act="close-sheet">Cancel</button></div>
+      <div class="sheetbody pick" lang="en-GB">${walkQA().map((q) => `<button type="button" class="qabtn" data-act="qa" data-k="${q.k}">${ico(QA_ICON[q.k] || "plus")}<span>${esc(q.label)}</span></button>`).join("")}</div></div></div>`); }
   if (a === "vul") { const k = "v" + b.dataset.i, V = S.job.overview.vulnerable = S.job.overview.vulnerable || {}; V[k] = Object.assign(V[k] || {}, { v: V[k]?.v === "Yes" ? "" : "Yes" }); save(); render(); }
   if (a === "vulnone") { const V = S.job.overview.vulnerable = S.job.overview.vulnerable || {}, all = P().vulnerable.every((g, i) => V["v" + i]?.v === "No");
     P().vulnerable.forEach((g, i) => { V["v" + i] = Object.assign(V["v" + i] || {}, { v: all ? "" : "No" }); }); save(); render(); }
@@ -972,7 +999,7 @@ document.addEventListener("click", async (e) => {
   if (a === "close-viewer") { $("#viewer")?.remove(); }
   if (a === "photo-del") confirmThen(b, "Tap again to delete this photo", async () => {
     const id = b.dataset.id, drop = (o) => { if (o?.photos) o.photos = o.photos.filter((x) => x !== id); };
-    S.job.locations.forEach((l) => l.items.forEach(drop)); Object.values(S.job.docs || {}).forEach(drop); Object.values(S.job.checks || {}).forEach(drop); drop(S.job.cover); S.job.actions.forEach(drop); if (sheetItem) drop(sheetItem);
+    S.job.locations.forEach((l) => { drop(l); l.items.forEach(drop); }); Object.values(S.job.docs || {}).forEach(drop); Object.values(S.job.checks || {}).forEach(drop); drop(S.job.cover); S.job.actions.forEach(drop); if (sheetItem) drop(sheetItem);
     delete S.job.photoMeta?.[id]; try { await Store.del("photos", id); } catch { /* already gone */ } S.photoCache.delete(id);
     $("#viewer")?.remove(); document.querySelectorAll(`[data-id="${id}"].thumb`).forEach((t) => t.remove()); save(); toast("Photo deleted.");
   });
@@ -997,7 +1024,7 @@ function toast(msg) { let t = $("#toast"); if (!t) { t = document.createElement(
 
 /* ---------------- backup ---------------- */
 async function exportJobs(jobs) {
-  const ids = new Set(); jobs.forEach((j) => { (j.cover?.photos || []).forEach((p) => ids.add(p)); j.actions.forEach((a) => (a.photos || []).forEach((p) => ids.add(p))); Object.values(j.checks || {}).forEach((c) => (c.photos || []).forEach((p) => ids.add(p))); j.locations.forEach((l) => l.items.forEach((i) => (i.photos || []).forEach((p) => ids.add(p)))); Object.values(j.docs || {}).forEach((d) => (d.photos || []).forEach((p) => ids.add(p))); });
+  const ids = new Set(); jobs.forEach((j) => { (j.cover?.photos || []).forEach((p) => ids.add(p)); j.actions.forEach((a) => (a.photos || []).forEach((p) => ids.add(p))); Object.values(j.checks || {}).forEach((c) => (c.photos || []).forEach((p) => ids.add(p))); j.locations.forEach((l) => (l.photos || []).forEach((p) => ids.add(p))); j.locations.forEach((l) => l.items.forEach((i) => (i.photos || []).forEach((p) => ids.add(p)))); Object.values(j.docs || {}).forEach((d) => (d.photos || []).forEach((p) => ids.add(p))); });
   const photos = {}; for (const id of ids) photos[id] = await photoData(id);
   const blob = new Blob([JSON.stringify({ app: "pfs-fra", version: 1, exported: new Date().toISOString(), jobs, photos })], { type: "application/json" });
   download(blob, `PFS-FRA-backup-${today()}.json`);

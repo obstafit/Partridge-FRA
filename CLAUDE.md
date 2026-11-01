@@ -86,6 +86,7 @@ python3 test_store.py           # storage fallback when IndexedDB or localStorag
 - **UI (v2.7 usability pass):**
   - One linear flow of eight steps, defined once in `STEPS` (`app.js`): Details, Building, Walk-through, Section checks, Management, Risk rating, Action plan, Report. The side rail (tablet), the phone step bar (`.stepbar`: Overview, back, current step, Next), the Overview checklist and each screen's heading (`head()`) all read it, so numbering is the same everywhere. The old phone tab bar is gone.
   - Stage 2 (v2.9): dashboard (`viewJobs`) with Continue card, real counts and Needs attention / In progress / Completed groups (`jobStatus()`); a compact 8-stage stepper under the job header on phones (`.stepper`); `stepState()` gives one colour rule everywhere (orange current, green done, amber needs attention, grey not started). `LOGO_SVG` in `app.js` is a placeholder mark until Mikey sends his real logo.
+  - Stage 3 (v3.0) walk-through (`viewWalk`): floor pills, location pills, a location header with all its photos (`locPhotos()`), category cards showing Pass / Fail / Review / Not assessed for that location, and a thumb-reach bar (Photos camera button + Add finding sheet). The tablet keeps the side list and add-location form (tests use `#nl_area`). New data: `location.photos` (general photos of a location); they are exported, deleted cleanly and listed in the PDF photo register.
   - `progress()` gives each step `pct`, `done`, `attn` and a plain-words `line`; the Overview and the job list cards show it. `readiness()` holds the pre-issue checks (used by the Report step and progress).
   - Rarely needed detail sits in collapsible cards (`grp()`); open/closed state survives re-renders via `S.open` (and `S.openAct` for action cards), set by a capture-phase `toggle` listener.
   - Guided one-at-a-time checks (`guidedBlock`): swipe right = Yes and move on, swipe left = No and open the note. Swipe code sits just before `IN_PREVIEW` in `app.js`.
@@ -112,12 +113,12 @@ python3 test_store.py           # storage fallback when IndexedDB or localStorag
 - Undo button after a swipe. Mikey asked how to go back; for now, Back is a tap.
 - Smooth screen transitions that keep the scroll position.
 - Re-assessment that starts from last year's job: previous answers shown, one tap for "no change".
-- One big camera button: take photos now, sort them into locations later.
+- One big camera button: done per location (Photos button on the walk-through). Still to do: assign a location photo to an item later.
 
 **Visual:**
 - Grouped cards on the Setup and Building screens, with "More details" collapsed and an "x of 5 key details" indicator.
-- Collapsible action cards.
-- PDF cover preview and a sticky "Create PDF" button.
+- Collapsible action cards (done v2.7). Still to do from DESIGN-BRIEF B5: High/Medium/Low count tiles at the top of the action plan.
+- PDF cover preview and a checklist of what is included on the Report step (DESIGN-BRIEF B6), and a sticky "Create PDF" button.
 - Job list cards with a risk-colour edge and a progress ring.
 
 **Bigger features:**

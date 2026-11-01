@@ -8,7 +8,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SRC, DIST = os.path.join(ROOT, "src"), os.path.join(ROOT, "dist")
-VERSION = "2.9.0"
+VERSION = "3.0.0"
 
 def read(name):
     with open(os.path.join(SRC, name), encoding="utf-8") as f:

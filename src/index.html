@@ -643,6 +643,53 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
   .main{padding-bottom:84px!important}
   .dash-top .primary .nw{display:none}
 }
+
+/* =====================================================================
+   STAGE 3 (v3.0): walk-through. Floor pills, location pills, a location header with its photos,
+   category cards with Pass / Fail / Review / Not assessed, and a thumb-reach bar: Photos + Add finding.
+   ===================================================================== */
+.floorpills{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 2px 8px;margin:0 -2px} .floorpills::-webkit-scrollbar{display:none}
+.floorpills button{flex:none;min-height:40px;padding:0 14px;border-radius:var(--r-pill);background:var(--surface);box-shadow:var(--shadow);font-size:.88rem;font-weight:600;color:var(--fg);position:relative}
+.floorpills button.on{background:var(--brand);color:#fff}
+.floorpills .dot{position:absolute;top:-4px;right:-4px;border-radius:999px;font-size:.65rem;min-width:18px;height:18px;display:grid;place-items:center;padding:0 4px}
+.locpills{padding-bottom:12px!important}
+.locpills button{min-height:44px!important;padding:0 14px!important;align-content:center;border-radius:var(--r-ctl)!important;font-weight:600!important}
+.locpills button.on{background:var(--accent-soft)!important;color:var(--accent-ink)!important;box-shadow:inset 0 0 0 2px var(--accent)!important}
+.locpills .addpill{display:flex!important;align-items:center;gap:4px;background:var(--surface)!important;color:var(--accent-ink)!important;box-shadow:inset 0 0 0 1.5px var(--line-strong)!important}
+.locpills .addpill .ico{width:18px;height:18px}
+.lochero{background:var(--surface);border-radius:var(--r-card);box-shadow:var(--shadow);padding:14px 16px;display:grid;gap:10px;margin-bottom:12px}
+.lh-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px} .lh-top h3{font-size:1.35rem;margin:2px 0 0;letter-spacing:-.02em}
+.lh-count{display:inline-flex;align-items:center;gap:5px;background:var(--field);border-radius:999px;padding:4px 10px;font-weight:650;font-size:.85rem;color:var(--fg);font-variant-numeric:tabular-nums} .lh-count .ico{width:16px;height:16px;color:var(--muted)}
+.lh-photos{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none} .lh-photos::-webkit-scrollbar{display:none}
+.lh-photos .thumb{flex:none;width:72px;height:72px;border-radius:10px;box-shadow:none}
+.lh-sum{margin:0;font-size:.85rem;color:var(--muted);font-weight:500} .c-fail{color:var(--bad-ink)} .c-rev{color:var(--warn-ink)}
+.qa.cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
+.cat{display:grid!important;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;column-gap:10px;row-gap:1px;align-items:center;text-align:left;min-height:64px!important;padding:10px 12px!important}
+.cat>.ico{grid-row:1/3}
+.cat .cl{font-weight:650;font-size:.95rem;color:var(--fg);line-height:1.2} .cat .cs{font-style:normal;font-size:.75rem;font-weight:650;color:var(--muted)}
+.cat.cat-pass{box-shadow:inset 4px 0 0 var(--ok),var(--shadow)!important} .cat.cat-pass .cs{color:var(--ok-ink)} .cat.cat-pass>.ico{background:var(--ok-soft);color:var(--ok-ink)}
+.cat.cat-fail{box-shadow:inset 4px 0 0 var(--bad),var(--shadow)!important} .cat.cat-fail .cs{color:var(--bad-ink)} .cat.cat-fail>.ico{background:var(--bad-soft);color:var(--bad-ink)}
+.cat.cat-rev{box-shadow:inset 4px 0 0 var(--warn),var(--shadow)!important} .cat.cat-rev .cs{color:var(--warn-ink)} .cat.cat-rev>.ico{background:var(--warn-soft);color:var(--warn-ink)}
+.cat.cat-na>.ico{background:var(--field);color:var(--muted)}
+.walk .more{margin:4px 0 8px} .walk .more .tog{margin-top:8px}
+.walk h3{margin:14px 4px 8px}
+.walkbar{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;margin:14px 0 6px}
+.wb-cam{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:52px;padding:0 18px;border-radius:var(--r-ctl);background:var(--brand);color:#fff;font-weight:650;cursor:pointer}
+.wb-cam .ico{width:22px;height:22px}
+.wb-add{min-height:52px!important;font-size:1.05rem!important;gap:6px}
+.dl{font-size:.88rem;min-height:40px;justify-self:start;margin-top:4px}
+.sheetbody.pick{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))!important;gap:8px!important}
+.sheetbody.pick .qabtn{min-height:84px;flex-direction:column;align-items:flex-start;justify-content:center;gap:6px;text-align:left;padding:12px}
+.sheetbody.pick .qabtn span,.cat .cl{overflow-wrap:normal;word-break:normal;hyphens:auto}
+.sheethead h3{white-space:nowrap}
+@media (max-width:760px){
+  .walk .locs{display:none!important}
+  .qa.cats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .walkbar{position:fixed;left:0;right:0;bottom:calc(52px + env(safe-area-inset-bottom,0px));z-index:11;margin:0;padding:8px max(12px,env(safe-area-inset-right,0px)) 8px max(12px,env(safe-area-inset-left,0px));background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:saturate(1.6) blur(14px);-webkit-backdrop-filter:saturate(1.6) blur(14px);border-top:1px solid var(--line)}
+  .pane.walk{padding-bottom:84px}
+  #toast{bottom:calc(132px + env(safe-area-inset-bottom,0px))!important}
+  .aifab{bottom:calc(132px + env(safe-area-inset-bottom,0px))!important}
+}
 </style>
 <div id="app"><div class="jobsbody"><p class="muted">Loading assessments…</p></div></div>
 <!--JSPDF-->
