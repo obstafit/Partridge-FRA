@@ -405,6 +405,9 @@ function grp(key, title, summary, body, def = false) {
   return `<details class="group" data-open="${key}"${open ? " open" : ""}><summary><span><strong>${esc(title)}</strong>${summary ? `<small>${summary}</small>` : ""}</span>${ico("next")}</summary><div class="groupbody">${body}</div></details>`;
 }
 function filled(paths) { const n = paths.filter((p) => String(getPath(S.job, p) ?? "").trim()).length; return n === paths.length ? `<b class="okc">✓ Complete</b>` : `${n} of ${paths.length} filled in`; }
+const STATE_WORDS = { cur: "current step", done: "complete", attn: "needs attention", todo: "not started" };
+/* One rule for the four stage colours everywhere: orange current, green complete, amber needs attention, grey not started. */
+function stepState(pr, k) { return k === S.view ? "cur" : pr[k].attn ? "attn" : pr[k].done ? "done" : "todo"; }
 function withJob(j, fn) { const o = S.job; S.job = j; try { return fn(); } finally { S.job = o; } }
 
 function render() {
@@ -418,14 +421,16 @@ function render() {
       <button class="back" data-act="go-jobs" aria-label="All jobs">All jobs</button>
       <div class="jobtitle"><strong>${esc(S.job.setup.address || "New assessment")}</strong><span>${esc(S.job.setup.ref || "")}${S.job.example ? " · Example" : ""}</span></div>
       <span id="savestate" class="saved">Saved on this device</span>
-    </div></header>
+    </div>
+    <ol class="stepper" aria-label="Assessment progress">${STEPS.map(([k, l], n) => { const st = stepState(pr, k);
+      return `<li class="st-${st}"><button data-act="nav" data-view="${k}" aria-label="Step ${n + 1}, ${esc(l)}: ${STATE_WORDS[st]}"${k === S.view ? ' aria-current="step"' : ""}><span>${st === "done" ? "✓" : n + 1}</span><em>${esc(l)}</em></button></li>`; }).join("")}</ol></header>
     <nav class="rail" aria-label="Assessment steps">${NAV.map(([k, l]) => { const p = pr[k], n = stepNo(k);
-      return `<button data-act="nav" data-view="${k}" class="${S.view === k ? "on" : ""}${p?.done ? " done" : ""}"${S.view === k ? ' aria-current="page"' : ""}><i>${k === "home" ? ico("grid") : p?.done ? "✓" : n}</i><span>${l}</span>${k === "actions" && pr.pend ? `<b class="badge">${pr.pend}</b>` : ""}</button>`; }).join("")}</nav>
+      return `<button data-act="nav" data-view="${k}" class="${S.view === k ? "on" : ""}${p ? " st-" + stepState(pr, k) : ""}${p?.done ? " done" : ""}"${S.view === k ? ' aria-current="page"' : ""}><i>${k === "home" ? ico("grid") : p?.done ? "✓" : n}</i><span>${l}</span>${k === "actions" && pr.pend ? `<b class="badge">${pr.pend}</b>` : ""}</button>`; }).join("")}</nav>
     <main class="main">${v()}</main>
     <nav class="stepbar" aria-label="Steps">
-      <button data-act="nav" data-view="home" class="sb-home${S.view === "home" ? " on" : ""}">${ico("grid")}<span>Overview</span></button>
+      <button data-act="nav" data-view="home" class="sb-home${S.view === "home" ? " on" : ""}" aria-label="Overview">${ico("grid")}</button>
       ${prev ? `<button data-act="nav" data-view="${prev[0]}" class="sb-prev" aria-label="Back to ${esc(prev[1])}">${ico("back")}</button>` : "<span></span>"}
-      <button data-act="nav" data-view="home" class="sb-now" aria-label="Show all steps"><small>${i ? `Step ${i} of ${STEPS.length}` : `${pr.done} of ${STEPS.length} steps done`}</small><strong>${esc(i ? stepName(S.view) : "Overview")}</strong><span class="sb-dots">${STEPS.map(([k]) => `<i class="${pr[k].done ? "d" : ""}${k === S.view ? " c" : ""}"></i>`).join("")}</span></button>
+      <span class="sb-now">${i ? `<small>Step ${i} of ${STEPS.length}</small><strong>${esc(stepName(S.view))}</strong>` : `<small>${pr.done} of ${STEPS.length} done</small><strong>Overview</strong>`}</span>
       ${next ? `<button data-act="nav" data-view="${next[0]}" class="sb-next">${esc(next[1])} ${ico("next")}</button>` : "<span></span>"}
     </nav>
   </div>`;
@@ -433,28 +438,48 @@ function render() {
   requestAnimationFrame(() => { document.querySelectorAll(".tabs button.on, .locpills button.on").forEach((b) => b.scrollIntoView({ inline: "center", block: "nearest" })); });
 }
 
+/* Placeholder brand mark until Mikey supplies the real Partridge Fire Safety logo. Replace this one constant (an SVG string). */
+const LOGO_SVG = `<svg class="logo" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="#20292D"/><path d="M20.5 7.5c1.2 4.6 7.5 7.6 7.5 14a8 8 0 0 1-16 0c0-3.3 1.6-5.6 3.6-7.4.1 2.2 1 3.6 2.6 4.4-.5-4 .3-7.8 2.3-11z" fill="#EF650B"/><path d="M20 31.6a4.3 4.3 0 0 1-4.3-4.3c0-2.4 1.9-3.6 2.9-5.6 1 2 5.7 2.9 5.7 5.6a4.3 4.3 0 0 1-4.3 4.3z" fill="#FFFFFF"/></svg>`;
+/* Dashboard status for a job, from real data only: Completed, Needs attention (with the reason) or In progress. */
+function jobStatus(j, pr) {
+  if (pr.done === STEPS.length || j.setup.status === "Final") return { k: "done", label: "Completed" };
+  const r = riskOf(j.risk.likelihood, j.risk.consequence), why = [];
+  if (/^(Substantial|Intolerable)$/.test(r)) why.push(`Rated ${r}`);
+  if (pr.pend) why.push(`${pr.pend} finding${pr.pend > 1 ? "s" : ""} not in the plan`);
+  if (j.setup.review && j.setup.review < today() && j.setup.status === "Final") why.push("Review overdue");
+  return why.length ? { k: "attn", label: "Needs attention", why: why.join(" · ") } : { k: "active", label: "In progress" };
+}
 function viewJobs() {
-  const list = S.jobs.slice().sort((a, b) => b.updated.localeCompare(a.updated));
+  const rows = S.jobs.slice().sort((a, b) => b.updated.localeCompare(a.updated)).map((j) => {
+    let pr; try { pr = withJob(j, () => progress(j)); } catch { pr = { pct: 0, done: 0, next: "setup", pend: 0 }; }
+    return { j, pr, st: jobStatus(j, pr) };
+  });
+  const card = ({ j, pr, st }) => { const rating = riskOf(j.risk.likelihood, j.risk.consequence), pc = Math.round(pr.pct * 100);
+    return `<li><button class="jobcard js-${st.k}" data-act="open-job" data-id="${j.id}">
+      <span class="jc-main"><strong>${esc(j.setup.address || "Untitled assessment")}</strong>
+      <span class="muted">${esc(SHORT_TYPE(j))}${j.setup.date ? " · " + ukDate(j.setup.date) : ""}</span>
+      <span class="jc-prog"><span class="bar"><i style="width:${pc}%"></i></span><small><b>${pc}%</b> · ${st.k === "done" ? "All 8 steps done" : `Step ${stepNo(pr.next)} of ${STEPS.length}: ${esc(stepName(pr.next))}`}</small></span>
+      ${st.why ? `<span class="jc-why">${esc(st.why)}</span>` : ""}</span>
+      <span class="jc-meta"><em class="spill sp-${st.k}">${st.label}</em>${rating ? `<em class="pill r-${rating}">${rating}</em>` : ""}${j.example ? `<em class="pill">Example</em>` : ""}</span>
+    </button></li>`; };
+  const groups = [["attn", "Needs attention"], ["active", "In progress"], ["done", "Completed"]].map(([k, l]) => [k, l, rows.filter((r) => r.st.k === k)]);
+  const cont = rows.find((r) => r.st.k !== "done");
   return `<div class="jobs">
-    <div class="brand"><div class="brandin"><div><p class="eyebrow">Partridge Fire Safety</p><h1>Fire risk assessments</h1>
-      <p class="lede">Works without signal. Jobs and photos stay on this device until you export them.</p></div>
-      <button class="primary" data-act="new-job">${ico("plus")} New assessment</button></div></div>
+    <header class="dash-top"><div class="dash-in">${LOGO_SVG}<div class="dash-brand"><strong>Partridge Fire Safety</strong><small>Fire risk assessments</small></div>
+      <button class="primary" data-act="new-job">${ico("plus")}<span class="nl">New</span><span class="nw"> assessment</span></button></div></header>
     <div class="jobsbody">
-      <ul class="joblist">${list.length ? list.map((j) => {
-        let pr; try { pr = withJob(j, () => progress(j)); } catch { pr = { pct: 0, done: 0, next: "setup" }; }
-        const rating = riskOf(j.risk.likelihood, j.risk.consequence);
-        return `<li><button class="jobcard" data-act="open-job" data-id="${j.id}">
-          <span class="jc-main"><strong>${esc(j.setup.address || "Untitled assessment")}</strong>
-          <span class="muted">${esc(j.setup.occType || j.setup.buildingType || "")}${j.setup.storeys ? " · " + esc(j.setup.storeys) + " storeys" : ""}${j.setup.date ? " · " + ukDate(j.setup.date) : ""}</span>
-          <span class="jc-prog"><span class="bar"><i style="width:${Math.round(pr.pct * 100)}%"></i></span><small>${pr.done === STEPS.length ? "All steps complete" : `${pr.done} of ${STEPS.length} steps done · next: ${esc(stepName(pr.next))}`}</small></span></span>
-          <span class="jc-meta">${j.example ? `<em class="pill">Example</em>` : ""}${rating ? `<em class="pill r-${rating}">${rating}</em>` : ""}${ico("next")}</span>
-        </button></li>`; }).join("") : `<li class="empty">No assessments yet. Start one with New assessment.</li>`}</ul>
+      ${Store.ok ? "" : `<p class="storewarn">This browser is not letting the app store data. Anything you enter will be lost when the page closes; export before leaving.</p>`}
+      ${cont ? `<button class="contcard" data-act="open-job" data-id="${cont.j.id}" data-view="${cont.pr.next}"><span class="cc-txt"><small>Continue assessment</small><strong>${esc(cont.j.setup.address || "Untitled assessment")}</strong>
+        <span class="cc-step">Step ${stepNo(cont.pr.next)} of ${STEPS.length}: ${esc(stepName(cont.pr.next))} · ${esc(cont.pr[cont.pr.next]?.line || "")}</span><span class="bar"><i style="width:${Math.round(cont.pr.pct * 100)}%"></i></span></span><span class="cc-go">${ico("next")}</span></button>` : ""}
+      ${rows.length ? `<div class="dash-stats">${groups.map(([k, l, g]) => `<div class="ds-${k}"><b>${g.length}</b><small>${l}</small></div>`).join("")}</div>` : ""}
+      ${rows.length ? groups.filter(([, , g]) => g.length).map(([k, l, g]) => `<section class="dgroup"><h2 class="dgrp">${l}<span>${g.length}</span></h2><ul class="joblist">${g.map(card).join("")}</ul></section>`).join("")
+        : `<div class="empty big">No assessments yet. Tap New assessment to start one.</div>`}
       <div class="backup"><h2>Backup</h2><p class="muted">Export saves every job and photo to one file. Keep a copy off the device.</p>
         <div class="row"><button data-act="export-all">Export all jobs</button><label class="btn"><input type="file" accept="application/json,.json" data-act-change="import" hidden>Import backup</label></div>
-        ${Store.ok ? "" : `<p class="warn">This browser is not letting the app store data. Anything you enter will be lost when the page closes; export before leaving.</p>`}
       </div>
     </div></div>`;
 }
+function SHORT_TYPE(j) { const s = j.setup, t = s.occType || s.flatsType || s.convType || ""; return [s.buildingType, t && t !== s.buildingType ? t : "", s.storeys ? s.storeys + " storeys" : ""].filter(Boolean).join(" · "); }
 
 function viewSetup() {
   const s = "setup.", st = S.job.setup, prof = P(), u = units(), sc = scope();
@@ -612,7 +637,10 @@ function progress(job = S.job) {
       line: pend ? `${pend} finding${pend > 1 ? "s" : ""} to add to the plan` : inc ? `${inc} action${inc > 1 ? "s" : ""} to finish` : job.actions.length ? `${job.actions.length} action${job.actions.length > 1 ? "s" : ""}` : "No findings yet" },
     report: { pct: warn ? Math.max(0.1, 1 - warn / 15) : 1, line: warn ? `${warn} thing${warn > 1 ? "s" : ""} to check before issue` : "Ready to issue" }
   };
-  STEPS.forEach(([k]) => { out[k].done = out[k].pct >= 1; });
+  const wBy = {}; readiness().forEach((w) => { const k = warnStep(w) || "report"; wBy[k] = (wBy[k] || 0) + 1; });
+  STEPS.forEach(([k]) => { out[k].done = out[k].pct >= 1; out[k].warn = wBy[k] || 0; out[k].attn = (!out[k].done && out[k].pct > 0) || (out[k].done && out[k].warn > 0); });
+  /* Report is the last step: it only needs attention once everything before it is done. */
+  const before = STEPS.slice(0, -1).every(([k]) => out[k].done); out.report.attn = before && !out.report.done; if (!before) out.report.pct = 0;
   out.done = STEPS.filter(([k]) => out[k].done).length;
   out.pct = STEPS.reduce((a, [k]) => a + Math.min(1, out[k].pct), 0) / STEPS.length;
   out.next = (STEPS.find(([k]) => !out[k].done) || ["report"])[0];
@@ -630,10 +658,10 @@ function viewHome() {
       <p class="muted">${esc(st.ref || "No reference yet")}${st.date ? " · " + esc(ukDate(st.date)) : ""}</p></div>
       ${r ? `<em class="pill r-${r}">${r}</em>` : ""}
       <div class="hprog"><div class="hbar"><i style="width:${Math.round(pr.pct * 100)}%"></i></div><small><b>${pr.done} of ${STEPS.length} steps complete</b> · ${Math.round(pr.pct * 100)}%</small></div></div>
-    <button class="primary carry" data-act="nav" data-view="${nk}">${ico(nk)}<span><small>${all ? "All steps complete" : `Continue · step ${stepNo(nk)}`}</small>${esc(stepName(nk))}: ${esc(pr[nk].line)}</span>${ico("next")}</button>
+    <button class="carry" data-act="nav" data-view="${nk}">${ico(nk)}<span><small>${all ? "All steps complete" : `Continue · step ${stepNo(nk)}`}</small>${esc(stepName(nk))}: ${esc(pr[nk].line)}</span>${ico("next")}</button>
     <div class="stats"><div><b>${pr.findings}</b><small>Deficienc${pr.findings === 1 ? "y" : "ies"}</small></div><div><b>${S.job.actions.length}</b><small>Action${S.job.actions.length === 1 ? "" : "s"}</small></div><div><b>${photos}</b><small>Photo${photos === 1 ? "" : "s"}</small></div></div>
     <ol class="steplist">${STEPS.map(([k, l, ph], i) => { const p = pr[k], h = ph !== lastPh ? `<li class="phase">${PHASES[ph]}</li>` : ""; lastPh = ph;
-      return `${h}<li><button class="step${p.done ? " done" : p.pct > 0 ? " part" : ""}${k === nk && !all ? " nextup" : ""}" data-act="nav" data-view="${k}"><span class="sn">${p.done ? "✓" : i + 1}</span><span class="st"><strong>${esc(l)}</strong><small>${esc(p.line)}</small>${!p.done && p.pct > 0 ? `<span class="bar"><i style="width:${Math.round(p.pct * 100)}%"></i></span>` : ""}</span>${ico("next")}</button></li>`; }).join("")}</ol>
+      return `${h}<li><button class="step${p.done ? " done" : p.pct > 0 ? " part" : ""}${p.attn ? " attn" : ""}${k === nk && !all ? " nextup" : ""}" data-act="nav" data-view="${k}"><span class="sn">${p.done ? "✓" : i + 1}</span><span class="st"><strong>${esc(l)}</strong><small>${esc(p.line)}</small>${!p.done && p.pct > 0 ? `<span class="bar"><i style="width:${Math.round(p.pct * 100)}%"></i></span>` : ""}</span>${ico("next")}</button></li>`; }).join("")}</ol>
   </section>`;
 }
 
@@ -878,7 +906,7 @@ document.addEventListener("click", async (e) => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const a = b.dataset.act;
   if (a === "new-job") { const j = newJob(); S.jobs.push(j); S.job = j; S.view = "setup"; S.loc = null; await Store.put("jobs", j); render(); }
-  if (a === "open-job") { S.job = normalise(S.jobs.find((j) => j.id === b.dataset.id)); S.view = "home"; S.loc = null; render(); }
+  if (a === "open-job") { S.job = normalise(S.jobs.find((j) => j.id === b.dataset.id)); S.view = b.dataset.view || "home"; S.loc = null; render(); }
   if (a === "go-jobs") { S.view = "jobs"; render(); }
   if (a === "nav") { S.view = b.dataset.view; render(); window.scrollTo(0, 0); }
   if (a === "seg") { const cur = getPath(S.job, b.dataset.path); setPath(S.job, b.dataset.path, cur === b.dataset.val ? "" : b.dataset.val); save();

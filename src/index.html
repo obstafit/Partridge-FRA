@@ -582,6 +582,67 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
 /* header */
 .top{border-bottom:1px solid var(--line)} .back{color:var(--accent-ink)}
 #toast{background:var(--brand)!important;color:#fff!important;border-radius:var(--r-ctl)!important;box-shadow:var(--shadow-lg)}
+
+/* =====================================================================
+   STAGE 2 (v2.9): dashboard, stage stepper and slim bottom bar.
+   Stage colours everywhere: orange current, green complete, amber needs attention, grey not started.
+   ===================================================================== */
+/* dashboard */
+.dash-top{background:var(--brand);color:#fff;padding:calc(env(safe-area-inset-top,0px) + 14px) max(16px,env(safe-area-inset-right,0px)) 16px max(16px,env(safe-area-inset-left,0px))}
+.dash-in{max-width:1040px;margin:0 auto;display:flex;align-items:center;gap:12px}
+.logo{width:40px;height:40px;flex:none;display:block} .dash-top .logo rect{fill:var(--brand-2)}
+.dash-brand{display:grid;flex:1;min-width:0;line-height:1.2} .dash-brand strong{font-size:1.05rem;font-weight:700;letter-spacing:-.01em} .dash-brand small{font-size:.78rem;opacity:.7}
+.dash-top .primary{min-height:44px;padding:0 14px;white-space:nowrap}
+.jobsbody{gap:16px!important;padding-top:16px!important}
+.contcard{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px;text-align:left;background:var(--surface);border-radius:var(--r-card);box-shadow:inset 4px 0 0 var(--accent),var(--shadow);padding:16px 16px 16px 20px;min-height:0}
+.cc-txt{display:grid;gap:4px;min-width:0} .cc-txt small{font-size:.7rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--accent-ink)}
+.cc-txt strong{font-size:1.1rem;font-weight:700;letter-spacing:-.015em} .cc-step{font-size:.85rem;color:var(--muted);font-weight:500} .cc-txt .bar{margin-top:6px;height:6px}
+.cc-go{width:44px;height:44px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center}
+.dash-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.dash-stats div{background:var(--surface);border-radius:var(--r-card);box-shadow:var(--shadow);padding:10px 8px;display:grid;text-align:center}
+.dash-stats b{font-size:1.35rem;font-weight:750;font-variant-numeric:tabular-nums} .dash-stats small{font-size:.74rem;color:var(--muted);font-weight:600}
+.ds-attn b{color:var(--warn-ink)} .ds-done b{color:var(--ok-ink)}
+.dgroup{display:grid;gap:8px}
+.dgrp{font-size:.72rem!important;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)!important;display:flex;align-items:center;gap:8px;margin:4px 4px 0}
+.dgrp span{background:var(--surface);box-shadow:var(--shadow);border-radius:999px;padding:1px 8px;color:var(--fg);letter-spacing:0}
+.jobcard{display:flex;justify-content:space-between;align-items:flex-start!important;text-align:left;padding:14px 16px!important}
+.jobcard.js-attn{box-shadow:inset 4px 0 0 var(--warn),var(--shadow)!important} .jobcard.js-done{box-shadow:inset 4px 0 0 var(--ok),var(--shadow)!important}
+.jc-main{display:grid;gap:3px} .jc-main strong{font-size:1rem;font-weight:650;line-height:1.3} .jc-main .muted{font-size:.85rem;font-weight:500}
+.jc-meta{display:flex;flex-direction:column;align-items:flex-end!important;gap:6px;flex:none}
+.jc-why{font-size:.8rem;color:var(--warn-ink);font-weight:600;margin-top:2px}
+.spill{font-style:normal;font-size:.72rem;font-weight:650;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.sp-done{background:var(--ok-soft);color:var(--ok-ink)} .sp-attn{background:var(--warn-soft);color:var(--warn-ink)} .sp-active{background:var(--field);color:var(--muted)}
+.carry{width:100%;display:grid;grid-template-columns:auto minmax(0,1fr) 44px;align-items:center;gap:12px;text-align:left;background:var(--surface);color:var(--fg);border-radius:var(--r-card);box-shadow:inset 4px 0 0 var(--accent),var(--shadow);padding:14px 14px 14px 18px;min-height:0;margin:0;font-size:1rem}
+.carry>.ico:first-child{color:var(--accent);width:24px;height:24px}
+.carry span{display:grid;gap:2px;font-weight:650} .carry small{font-size:.7rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--accent-ink);opacity:1}
+.carry>.ico:last-child{width:44px;height:44px;padding:11px;box-sizing:border-box;border-radius:50%;background:var(--accent);color:#fff}
+/* stage stepper (phone, under the job header) */
+.stepper{display:none}
+.rail button.st-done i{background:var(--ok-soft);color:var(--ok-ink)} .rail button.st-attn i{background:var(--warn-soft);color:var(--warn-ink)}
+.rail button.on i{background:var(--accent)!important;color:#fff!important}
+.step.attn .sn{background:var(--warn-soft);color:var(--warn-ink)}
+@media (max-width:760px){
+  .topin{min-height:48px}
+  .stepper{list-style:none;margin:0;padding:0 max(8px,env(safe-area-inset-right,0px)) 6px max(8px,env(safe-area-inset-left,0px));display:grid;grid-template-columns:repeat(8,minmax(0,1fr))}
+  .stepper li{position:relative;display:flex;justify-content:center}
+  .stepper li+li::before{content:"";position:absolute;top:13px;right:50%;width:100%;height:2px;background:var(--line-strong)}
+  .stepper li.st-done+li::before{background:var(--ok)}
+  .stepper button{position:relative;z-index:1;min-height:30px;width:100%;padding:2px 0;background:transparent;box-shadow:none;display:grid;justify-items:center}
+  .stepper span{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:.72rem;font-weight:700;background:var(--surface);box-shadow:inset 0 0 0 1.5px var(--line-strong);color:var(--muted);font-variant-numeric:tabular-nums}
+  .stepper .st-done span{background:var(--ok);color:#fff;box-shadow:none}
+  .stepper .st-attn span{background:var(--warn-soft);color:var(--warn-ink);box-shadow:inset 0 0 0 2px var(--warn)}
+  .stepper .st-cur span{width:28px;height:28px;margin-top:-2px;background:var(--accent);color:#fff;box-shadow:0 0 0 3px var(--accent-soft);font-size:.8rem}
+  .stepper em{display:none}
+  /* slim bottom bar: Overview, back, where you are, next */
+  .stepbar{grid-template-columns:44px 40px minmax(0,1fr) auto!important;padding-top:4px!important;padding-bottom:calc(4px + env(safe-area-inset-bottom,0px))!important;gap:2px!important}
+  .stepbar button{min-height:44px!important}
+  .sb-home{color:var(--muted)} .sb-home .ico{width:22px;height:22px}
+  .sb-now{display:grid!important;justify-items:start;padding-left:4px;line-height:1.15}
+  .sb-now strong{font-size:.9rem} .sb-now small{font-size:.66rem}
+  .stepbar .sb-next{min-height:40px!important;font-size:.85rem}
+  .main{padding-bottom:84px!important}
+  .dash-top .primary .nw{display:none}
+}
 </style>
 <div id="app"><div class="jobsbody"><p class="muted">Loading assessments…</p></div></div>
 <!--JSPDF-->

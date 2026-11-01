@@ -85,7 +85,8 @@ python3 test_store.py           # storage fallback when IndexedDB or localStorag
   - The app calls `navigator.storage.persist()` on boot.
 - **UI (v2.7 usability pass):**
   - One linear flow of eight steps, defined once in `STEPS` (`app.js`): Details, Building, Walk-through, Section checks, Management, Risk rating, Action plan, Report. The side rail (tablet), the phone step bar (`.stepbar`: Overview, back, current step, Next), the Overview checklist and each screen's heading (`head()`) all read it, so numbering is the same everywhere. The old phone tab bar is gone.
-  - `progress()` gives each step `pct`, `done` and a plain-words `line`; the Overview and the job list cards show it. `readiness()` holds the pre-issue checks (used by the Report step and progress).
+  - Stage 2 (v2.9): dashboard (`viewJobs`) with Continue card, real counts and Needs attention / In progress / Completed groups (`jobStatus()`); a compact 8-stage stepper under the job header on phones (`.stepper`); `stepState()` gives one colour rule everywhere (orange current, green done, amber needs attention, grey not started). `LOGO_SVG` in `app.js` is a placeholder mark until Mikey sends his real logo.
+  - `progress()` gives each step `pct`, `done`, `attn` and a plain-words `line`; the Overview and the job list cards show it. `readiness()` holds the pre-issue checks (used by the Report step and progress).
   - Rarely needed detail sits in collapsible cards (`grp()`); open/closed state survives re-renders via `S.open` (and `S.openAct` for action cards), set by a capture-phase `toggle` listener.
   - Guided one-at-a-time checks (`guidedBlock`): swipe right = Yes and move on, swipe left = No and open the note. Swipe code sits just before `IN_PREVIEW` in `app.js`.
   - Short option lists render as chips (`seg(..., "chips")`). The tests use a `pick()` helper for this. Test photos `out/p0-2.jpg` are generated, not committed.
